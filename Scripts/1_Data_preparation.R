@@ -1,68 +1,140 @@
 # ////////////////////////////////////////////////////////////////////////////////////////////////
+# ////////////////////////////////////////////////////////////////////////////////////////////////
 # Library load ----
 # ////////////////////////////////////////////////////////////////////////////////////////////////
+# ////////////////////////////////////////////////////////////////////////////////////////////////
 
+# Tidyverse es para cargar todo un conjunto de librerías para la programación funcional
 library(tidyverse)
+# haven habilita la conversión de datos de SPSS, además de que permite pasar facilmente de 
+# una variable double labelled a un factor.
 library(haven)
+# Habilita la función tidy y otras herramientas cómodas para el manejo de modelos
+library(broom)
 
+
+
+
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////
 # ////////////////////////////////////////////////////////////////////////////////////////////////
 # Data load ----
 # ////////////////////////////////////////////////////////////////////////////////////////////////
+# ////////////////////////////////////////////////////////////////////////////////////////////////
 
+# Los datos son los correspondientes al PEPs 
 PEP <- read_sav("Data/Definitive_PEPs.sav")
 
+
+
+
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# Diccionario de variables ----
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+
+diccionario_variables <- list(
+  'identificadores' = c(
+    names(PEP)[1:27], 
+    'disponibilidad',
+    'fecha_entrevista',
+    'antecedentes_psiquiatricos',
+    'antecedentes_psiquiatricos_espe',
+    'antecedentes_psicoticos',
+    'antecedentes_psicoticos_espe'),
+  'trastornos' = names(PEP)[80:379],
+  'mediciones_Basal'  = str_subset(names(PEP), 'VB|BASAL'),
+  'mediciones_2M'     = str_subset(names(PEP),'V2M'),
+  'mediciones_6M'     = str_subset(names(PEP), 'V6M'),
+  'mediciones_1A'     = str_subset(names(PEP), 'V1A|V12M '),
+  'mediciones_2A'     = str_subset(names(PEP), 'V2A|V24M'),
+  'historia_familiar' = str_subset(names(PEP),'[pP]adre|[Mm]adre|[Hh]ermano|[Hh]ijo|[Pp]ariente'),
+  'encefalo' = names(PEP)[2421:2548])
+
+diccionario_variables
+
+
+
+
+
 # ////////////////////////////////////////////////////////////////////////////////////////////////
-# Data Basics ----
+# Analisis descriptiva ----
 # ////////////////////////////////////////////////////////////////////////////////////////////////
 
-## Dimensiones del dataframe
+# /////////////////////////////////////////////
+## Dimensiones del dataframe -----
+# /////////////////////////////////////////////
+
 n<- dim(PEP)[1] # Numero de individuos
 p<- dim(PEP)[2] # Numero de variables
 
-## Calculo de NA
+# /////////////////////////////////////////////
+## Numero de variables perdidas no classificadas de las 2548 iniciales -----
+# /////////////////////////////////////////////
 
-tibble( 
+p - diccionario_variables %>% map_dbl(~length(.x)) %>% sum()
+
+# /////////////////////////////////////////////
+## Total de NA presentes por variable  ----
+# /////////////////////////////////////////////
+
+NA_variables <- tibble( 
   'Nombre_variable' = names(PEP),
   'Recuento_NA' = map_dbl(PEP, ~sum(is.na(.x))),
   'NA_ratio' = map_dbl(PEP, ~sum(is.na(.x))/n )) %>% 
-  arrange(desc(NA_ratio)) %>%
-  view()
+  arrange(desc(NA_ratio))
 
-## Diccionario de variables
+quantile(NA_variables$NA_ratio, seq(0,1,0.1) )
 
-identificadores <- c(
-  names(PEP)[1:27], 
-  'disponibilidad',
-  'fecha_entrevista',
-  'antecedentes_psiquiatricos',
-  'antecedentes_psiquiatricos_espe',
-  'antecedentes_psicoticos',
-  'antecedentes_psicoticos_espe')
+NA_variables %>%
+  filter(NA_ratio == 1)
 
-trastornos <- names(PEP)[80:379]
+NA_variables %>%
+  filter(NA_ratio > 0.9)
 
-mediciones_Basal  <- str_subset(names(PEP), 'VB|BASAL')
+NA_variables %>%
+  filter(NA_ratio > 0.8)
 
-mediciones_2M     <- str_subset(names(PEP),'V2M')
+NA_variables %>% 
+  ggplot(aes(NA_ratio)) +
+  geom_density()
 
-mediciones_6M     <- str_subset(names(PEP), 'V6M')
+# /////////////////////////////////////////////
+## Total de NA presentes por Individuo  ----
+# /////////////////////////////////////////////
+### Necesario para hacer un seguimiento de los casos que mas dropean el estudio por ejemplo
 
-mediciones_1A     <- str_subset(names(PEP), 'V1A|V12M ')
+NA_ind <- data.frame(
+  'id'= 1:n,
+  'NA_count'  = unlist(apply(PEP, MARGIN = 1, function(x) sum(is.na(x)))),
+  'NA_percent'= unlist(apply(PEP, MARGIN = 1, function(x) sum(is.na(x))))/p)
 
-mediciones_2A     <- str_subset(names(PEP), 'V2A|V24M')
+quantile(NA_ind$NA_count, seq(0,1,0.1) )
 
-historia_familiar <- str_subset(names(PEP),'[pP]adre|[Mm]adre|[Hh]ermano|[Hh]ijo|[Pp]ariente')
-
-encefalo <- names(PEP)[2421:2548]
-
-
-
-p - sum(
-  map_dbl( 
-    ls()[ls() %in% c( 
-      "encefalo","historia_familiar","identificadores",'trastornos',
-      "mediciones_Basal","mediciones_2M","mediciones_6M","mediciones_1A","mediciones_2A")], 
-    ~ length(get(.x)) ))
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+## NA data in sub dictionaries ----
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
 
 
+### identificadores -----
+
+aux <- PEP %>%
+  select(any_of(diccionario_variables$identificadores)) %>%
+  mutate_if(is.labelled,as_factor)
+
+aux %>%
+  map(~summary(.x))
+
+aux %>%
+  map_dfr(~sum(is.na(.)))
+
+### Mediciones basales ----
+
+PEP %>%
+  select(any_of(identificadores)) %>%
+  mutate_if(is.labelled,as_factor) %>%
+  map(~summary(.x))
 
