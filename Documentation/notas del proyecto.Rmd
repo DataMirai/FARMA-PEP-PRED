@@ -1,8 +1,10 @@
 ---
 title: "Tareas y notas del proyecto"
 author: "Aitor Gonzalez"
-date: '2022-06-22'
-output: html_document
+output: 
+  html_document:
+    toc: yes
+    toc_float: yes
 ---
 
 # Notas de la preparacion de datos
@@ -20,11 +22,12 @@ output: html_document
 
 - Las variables **Lewis** son compliaciones obstetricas en el paciente (variables dicotomicas). LAs diferentes variables miden difernetes modos de compliaciones, interesan. Interesan conservarlos todas las variables. Esto son el compedio de todas las escalas, se pueden conservar y usar sin problemas
 
-- Interesna 2 edades: 
-    - edad del inicio del estidio (fecha_entrevista - fecha_nacimiento )
+- Interesna 4 edades: 
+    - edad al inicio del estidio (fecha_entrevista - fecha_nacimiento )
     - edad del diagnostico del primer episodio (fecha_primer_diagnostico - fecha_nacimiento)
     - La diferencia entre primer diagnostico y inicio del estudio sería el tiempo con símptomas sin estar en el estudio **este tiempo debería de ser inferior a 1 año**. Puede estar en trarttamiento, y esto afecta a la detección de símptomas. (Efecto placebo, detectaremos mejoras en el estudio causadas por la mejora del tratatmeinto previo que se le dió.)
-
+    - La edad de la primera hospitalizacion (fecha_entrevista)
+    - La edad de la estimacion de cuando comenzaron los simptomas.
 - etnia convertir a variable dicotomica: 0 caucasicos y 1 todos los demás.
 - El hecho de que la madre haya sido migrnate puede afectar (ser migrante afecta por que la madre puede tener factores estresante que se manifiestan en la preadolescencia. ) 
 - Convertir lugar_naci_pais a ina variable de posible inmigracion. Si españa, residente, resto inmigrante internacional.
@@ -33,12 +36,18 @@ output: html_document
 - Conservar nivel_socioeconomico y nivel_urbanicidad como variable de interés. El nivel socioeconomico  es un conjunto de simptomas. Los entornos urbanos son más estresantes que los rurales. Area urbana esta sesgada por que reclutamos en areass urbanas, no rurales. **Hay sesgo en el proceso de reclutamiento, todos los controles vienen de la areas del exicample en cambio los casos reales pueden venir de cualquier rincón. Están desapareados.**
 - "antecedentes_psiquiatricos" "antecedentes_psiquiatricos_espe" "antecedentes_psicoticos" "antecedentes_psicoticos_espe" son variables desechables.
 - antecedentespsiquiátricos se queda, es el identificadores bueno. Es una simplificación De todo. Interesa una simplificación.
+- PAS, ajuste premorbido: son las variables infanciaVB adolescenciatempranaVB adolescenciatardíaVB adultoVB generalVB puntuacionTotal_PAS_VB
+- DUP, tiempo en dias en el que han estado sin tratamiento psicotico.
+- DTP dias de psicosis trattada, (variable contraria a la DUP)
+
+
  
 ## historia familiar
 
 - Descartar toda la seccion de  historia familiar del diccionario de variables 
 
 *causa de descarte*: (queda descartada por el contexto de que está todo resumido en la variable identificadora antecedentespsiquiátricos)
+
 
 
 ## Trastornos
@@ -61,7 +70,16 @@ Además, estás variables se recogen cuando el diagnóstico está completamente 
 
 ## Bloque farmacologico 
 
-1689:1772
+### Blque de variables 1689:1772
 
+hay variables de farmacos 1,2,3,4,5
+no todos los farmacos en farmaco 1 son antipsicoticos
+posologia : dosis
+corpromacinna: dosis equivalentes de corpromacina
 
+2073:2129
+medicion de niveles plasmaticos de antipsicoticos 
+antipsicotico nivel: parte del antipsicotico que está sin metabolizar
+antipsicotico activo: parte del antipsicotico que ha sido metabolizado.
 
+mas adelante se crearán variables para la parte de principios activos metabolicos.
