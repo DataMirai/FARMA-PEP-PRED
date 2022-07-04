@@ -265,6 +265,12 @@ PEP %>%
   select(any_of(diccionario_variables$farma)) %>% 
   view()
 
+PEP %>%
+  select(any_of(diccionario_variables$farma)) %>% 
+  select(matches('^([fF])arma')) %>%
+  map(~ str_extract(.x, '^[:digit:].{1,}')) %>%
+  flatten() %>%
+  unlist()
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # Arreglo en diccionario variables toxicologicas ----
