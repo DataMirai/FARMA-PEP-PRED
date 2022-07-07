@@ -251,8 +251,7 @@ PEP %>%
       TRUE~'No'))) %>%
   select(-c(lugar_naci_pais:nivel_ocupacional_progenitor, disponibilidad:antecedentes_psicoticos_espe )) %>%
   # Reordernar variables
-  select(ident_caso, tipo_sujeto, sexo, etnia, edad_estudio, edad_primer_episodio,edad_primer_diagnostico, edad_primera_hospitalizacion,inmigrante, everything()) %>%
-  view()
+  select(ident_caso, tipo_sujeto, sexo, etnia, edad_estudio, edad_primer_episodio,edad_primer_diagnostico, edad_primera_hospitalizacion,inmigrante, everything()) 
   
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -270,19 +269,20 @@ PEP %>%
   select(matches('^([fF])arma')) %>%
   map(~ str_extract(.x, '^[:digit:].{1,}')) %>%
   flatten() %>%
-  unlist()
+  unlist() %>%
+  .[!is.na(.)] %>%
+  unique()
+  
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # Arreglo en diccionario variables toxicologicas ----
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 
-PEP[,c(1283,1289,1295,1301,1307,1309,1311,1312,1313,1315,1317, # basal
-       1319,1323,1327,1331,1335,1337,1339,1340,1341,1343,1345, #2 meses
-       1347,1351,1355,1359,1363,1365,1367,1368,1369,1371,1373, # 6 meses
-       1375,1379,1383,1387,1391,1393,1395,1396,1397,1399,1401)] %>%
-  names()
-
-
 PEP %>%
   select(any_of(diccionario_variables$toxicos))
+
+160000*0.66 *0.01
+
+1056 / 329500000
+1/3.204856e-06
