@@ -282,7 +282,4 @@ PEP %>%
 PEP %>%
   select(any_of(diccionario_variables$toxicos))
 
-160000*0.66 *0.01
 
-1056 / 329500000
-1/3.204856e-06
