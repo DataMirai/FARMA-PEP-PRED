@@ -14,8 +14,7 @@ output:
 
 ## Pendientes de hacer
 
-- los controles no tienen/ no deberian  trastornos , revisar!!!!
-
+Cambia diccionario de variables para incluir las nuevas.
 
 # Notas del diccioanrio de variables
 ## Identificadores
@@ -68,18 +67,47 @@ Además, estás variables se recogen cuando el diagnóstico está completamente 
 
 1283:1433
 
+medir la persistencia del consumo (medir si está consumiendo cada visita)
+
 ## Bloque farmacologico 
 
 ### Blque de variables 1689:1772
 
 hay variables de farmacos 1,2,3,4,5
-no todos los farmacos en farmaco 1 son antipsicoticos
+no todos los farmacos en farmacoX son antipsicoticos: solo aquellos que ya tienen el nombre sencillo, aquellos que no tengan nombre complejos (empezando por un código por ejemplo) son otros fármacos que habrá que hacer su clasificación correspondiente.
 posologia : dosis
-corpromacinna: dosis equivalentes de corpromacina
+corpromacinna: dosis equivalentes de corpromacina (un suero utilizado como unidad de referencia para unas bases )
+**Hay que mantener la temporalidad**: extraer variables acorde a su momento en el tiempo para cadad paciente.
+farmacoX_A : visita a los 2 meses
+farmacoX_B : visita a los 6 meses
+farmacoX_C : visita a los 12 meses
 
-2073:2129
+
+**HACER**: Vamos a haxer una listra con dos data frames, 
+1 para los antipsicoticos y el otro con los otros farmacos
+
+
+
+### Blque de variables 2073:2129
+**Pendientes d ehacer por falta de código del antipsicótico**. está clasificado como números y desconocemos la relación númerica y del antipsicótico 
 medicion de niveles plasmaticos de antipsicoticos 
 antipsicotico nivel: parte del antipsicotico que está sin metabolizar
 antipsicotico activo: parte del antipsicotico que ha sido metabolizado.
 
 mas adelante se crearán variables para la parte de principios activos metabolicos.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -26,7 +26,7 @@ library(readxl)
 # Los datos son los correspondientes al PEPs del experimento
 PEP <- read_sav("Data/Definitive_PEPs.sav") %>%
   mutate_if(is.labelled,as_factor) %>%
-  # falta la variable identificadora DTP, que está en otro archivp, la aádoimos al data frame
+  # añadimos la variable identificadora DTP, que está en el PEP DTP
   inner_join(read_excel("Data/DTP_PEPs.xlsx"), by=c('ident_caso' = 'ID')  )
 
 
@@ -132,6 +132,12 @@ diccionario_variables <- list(
     "Inhalantesconsumo_V1AÑO"),
   'farma' = c(names(PEP)[1689:1772], names(PEP)[2073:2129]))
 
+# /////////////////////////////////////////////
+## Dimensiones del dataframe -----
+# /////////////////////////////////////////////
+
+# n <- dim(PEP)[1] # Numero de individuos
+# p <- dim(PEP)[2] # Numero de variables
 
 # /////////////////////////////////////////////
 ## Numero de variables perdidas no classificadas de las 2548 iniciales -----
@@ -140,85 +146,12 @@ diccionario_variables <- list(
 # Aun creando todo el diccionario de variables, no todas las variables son clasificadas adecuadamente
 # estas son las que quedarían por clasificar de alguna forma u otra.
 
-p - diccionario_variables %>% map_dbl(~length(.x)) %>% sum()
+# p - diccionario_variables %>% map_dbl(~length(.x)) %>% sum()
 
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////
 # Analitica descriptiva ----
 # ////////////////////////////////////////////////////////////////////////////////////////////////
-
-# /////////////////////////////////////////////
-## Dimensiones del dataframe -----
-# /////////////////////////////////////////////
-
-n<- dim(PEP)[1] # Numero de individuos
-p<- dim(PEP)[2] # Numero de variables
-
-
-# /////////////////////////////////////////////
-## Total de NA presentes por variable  ----
-# /////////////////////////////////////////////
-
-NA_variables <- tibble( 
-  'Nombre_variable' = names(PEP),
-  'Recuento_NA' = map_dbl(PEP, ~sum(is.na(.x))),
-  'NA_ratio' = map_dbl(PEP, ~sum(is.na(.x))/n )) %>% 
-  arrange(desc(NA_ratio))
-
-quantile(NA_variables$NA_ratio, seq(0,1,0.1) )
-
-NA_variables %>%
-  filter(NA_ratio == 1)
-
-NA_variables %>%
-  filter(NA_ratio > 0.9)
-
-NA_variables %>%
-  filter(NA_ratio > 0.8)
-
-# NA_variables %>% 
-#   ggplot(aes(NA_ratio)) +
-#   geom_density()
-
-# /////////////////////////////////////////////
-## Total de NA presentes por Individuo  ----
-# /////////////////////////////////////////////
-### Necesario para hacer un seguimiento de los casos que mas dropean el estudio por ejemplo
-
-NA_ind <- data.frame(
-  'id'= 1:n,
-  'NA_count'  = unlist(apply(PEP, MARGIN = 1, function(x) sum(is.na(x)))),
-  'NA_percent'= unlist(apply(PEP, MARGIN = 1, function(x) sum(is.na(x))))/p)
-
-quantile(NA_ind$NA_count, seq(0,1,0.1) )
-
-
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-## Sumario por categorias del diccioanrio de variables ----
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-Sumario_variables_diccionario <- diccionario_variables %>%
-  map(
-    ~ list(
-      'resumen_variables'= PEP %>%
-        select(any_of(.x)) %>%
-        map(~summary(.)),
-      'resumen_NA' = PEP %>%
-        select(any_of(.x)) %>%
-        imap_dfr(
-          ~ data.frame(
-            'variable'= .y,
-            'NA_n'= sum(is.na(.x)))) %>%
-        mutate(
-          'NA_perct_variable'= NA_n / n )
-    )
-  )
-
-
-Sumario_variables_diccionario$identificadores$resumen_variables
 
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -238,7 +171,7 @@ PEP %>%
     'edad_primer_diagnostico'      = year(as.period(interval(fecha_nacimiento, fecha_primer_diagnostico ))),
     'edad_estudio'                 = year(as.period(interval(fecha_nacimiento, fecha_entrevista))),) %>%
   select(-c(fecha_nacimiento ,primera_entrevista, fecha_entrevista, fecha_primer_diagnostico,Iniciosíntomaspsicóticos_Fecha_estimacion_entrevistador)) %>%
-  # Modificamos la etnia para ternr una sola dicotomica
+  # Modificamos la etnia para tener una sola dicotomica
   mutate(
     etnia = case_when(
       etnia == 'caucasian' ~ 'caucasian',
@@ -260,18 +193,6 @@ PEP %>%
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-PEP %>%
-  select(any_of(diccionario_variables$farma)) %>% 
-  view()
-
-PEP %>%
-  select(any_of(diccionario_variables$farma)) %>% 
-  select(matches('^([fF])arma')) %>%
-  map(~ str_extract(.x, '^[:digit:].{1,}')) %>%
-  flatten() %>%
-  unlist() %>%
-  .[!is.na(.)] %>%
-  unique()
   
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -281,5 +202,147 @@ PEP %>%
 
 PEP %>%
   select(any_of(diccionario_variables$toxicos))
+
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# Arreglo en diccionario variables Simtomatologicas de estado basal ----
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+
+# PEP basal, conservar variables en el diccioanrio de variables.
+PEP %>%
+  select(
+  'GravedaddelaenfermedadVB',
+  'EEAGpuntuacionTotalVB',
+  'total_positivosVB',
+  'total_negativosVB',
+  'total_generalesVB',
+  'total_panssVB',
+  'YOUNGpuntuacionTotalVB',
+  'MADRSpuntuacionTotalVB',
+  'puntuacionTotalVB', #escala de tios de Valencia
+  'PuntuaciónTotalFASTVB',
+  "peso_VB",
+  "Presión_sistolica_VB",
+  "Presión_diastolica_VB","imc_VB", "perimetro_VB" ,
+  "BASAL_Hematocrito","BASAL_Hemoglobina","BASAL_Hematies","BASAL_VCM",
+  "BASAL_HCM","BASAL_CHCM","BASAL_Plaquetas","BASAL_VPM","BASAL_IDP","BASAL_Leucocitos_totales",
+  "BASAL_Eosinófilos_totales","BASAL_Basófilos_totales","BASAL_Linfocitos_totales",
+  "BASAL_Monocitos_totales","BASAL_Neutrofilos_totales","BASAL_Eritrosedimentación",
+  "BASAL_Glucosa_suero","BASAL_Creatinina_suero","BASAL_Sodio","BASAL_Potasio","BASAL_Calcio",
+  "BASAL_Fósforo","BASAL_Cloro","BASAL_Hemoglobina_glicosilada","BASAL_Trigliceridos",
+  "BASAL_Colesterol_total","BASAL_Colesterol_HDL","BASAL_Colesterol_LDL","BASAL_TSH",
+  "BASAL_T4_libre","BASAL_Prolactina","BASAL_Estradiol","BASAL_FSH","BASAL_Progesterona",
+  "BASAL_LH","BASAL_Testosterona","electroVB","anormalidadVB",
+  "Taquicardia_sinusalVB","Bradicardia_sinusalVB",
+  "Latido_supraventricular_prematuroVB","Latido_ventricular_prematuroVB",
+  "Hipertrofia_auricular_izquierdaVB","Taquicardia_supraventricularVB",
+  "Taquicardia_ventricularVB","Inversiones_simetricas_onda_TVB",
+  "Pobre_progresion_onda_RVB","Otros_específicos_ST_TVB",
+  "Bloqueo_completo_izquierdaVB","Bloqueo_completo_ramaderechaVB",
+  "Bloqueo_incompleto_rama_izquierdaVB","Bloqueo_incompleto_rama_derechaVB",
+  "Sindrome_pre_excitacionVB","Otros_especificarVB",
+  "fecha_ecgVB","lpmVB","qrsVB","prVB","qtVB") %>%
+  names()
+
+
+
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# Arreglo en diccionario variables Simtomatologicas de estado dos meses ----
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+
+# conservar variable mejoria global
+
+#buscar las variables que contengan al final
+# variable SAS simpson agnus scale
+# variable UKU 
+
+
+
+test<- list(
+  #Escalas
+  'GravedaddelaenfermedadVB','EEAGpuntuacionTotalVB',
+  'total_positivosVB','total_negativosVB','total_generalesVB','total_panssVB',
+  'YOUNGpuntuacionTotalVB','MADRSpuntuacionTotalVB',
+  'puntuacionTotalVB', #escala de tios de Valencia
+  'PuntuaciónTotalFASTVB',
+  # Peso
+  "peso_VB","imc_VB", "perimetro_VB" ,
+  #Bioquimicas
+  "BASAL_Hematocrito","BASAL_Hemoglobina","BASAL_Hematies","BASAL_VCM",
+  "BASAL_HCM","BASAL_CHCM","BASAL_Plaquetas","BASAL_VPM","BASAL_IDP","BASAL_Leucocitos_totales",
+  "BASAL_Eosinófilos_totales","BASAL_Basófilos_totales","BASAL_Linfocitos_totales",
+  "BASAL_Monocitos_totales","BASAL_Neutrofilos_totales","BASAL_Eritrosedimentación",
+  "BASAL_Glucosa_suero","BASAL_Creatinina_suero","BASAL_Sodio","BASAL_Potasio","BASAL_Calcio",
+  "BASAL_Fósforo","BASAL_Cloro","BASAL_Hemoglobina_glicosilada","BASAL_Trigliceridos",
+  "BASAL_Colesterol_total","BASAL_Colesterol_HDL","BASAL_Colesterol_LDL","BASAL_TSH",
+  "BASAL_T4_libre","BASAL_Prolactina","BASAL_Estradiol","BASAL_FSH","BASAL_Progesterona",
+  "BASAL_LH","BASAL_Testosterona",
+  # Cardio
+  "Presión_sistolica_VB", "Presión_diastolica_VB","electroVB","anormalidadVB",
+  "Taquicardia_sinusalVB","Bradicardia_sinusalVB",
+  "Latido_supraventricular_prematuroVB","Latido_ventricular_prematuroVB",
+  "Hipertrofia_auricular_izquierdaVB","Inversiones_simetricas_onda_TVB",
+  "Taquicardia_supraventricularVB","Taquicardia_ventricularVB",
+  "Pobre_progresion_onda_RVB","Otros_específicos_ST_TVB",
+  "Bloqueo_completo_izquierdaVB","Bloqueo_completo_ramaderechaVB",
+  "Bloqueo_incompleto_rama_izquierdaVB","Bloqueo_incompleto_rama_derechaVB",
+  "Sindrome_pre_excitacionVB","Otros_especificarVB",
+  #Fechas y otras cosas
+  "fecha_ecgVB","lpmVB","qrsVB","prVB","qtVB")
+
+
+test2 <- str_remove_all(test, '_VB|BASAL_|VB')
+
+#quitar "Sindrome_pre_excitacionV2M","Otros_especificarV2M","fecha_ecgV2M"
+
+
+PEP %>%
+  select(contains('V2M')) %>%
+  select(matches(test2)) %>%
+  mutate(PuntuaciónTotalV2M_UKU = PEP$PuntuaciónTotalV2M_UKU) %>%
+  select(-c(
+    prueba_embarazo_V2M:Ociopracticardeporte23V2M,
+    aprenderaaprender_PDV2M: aprenderaaprender_PCV2M,
+    V2M_Hemoglobina_glicosilada)) %>%
+  select(gravedaddelaenfermedadV2M:PuntuaciónTotalFASTV2M, PuntuaciónTotalV2M_UKU, everything()) %>%
+  names()
+
+
+#quitar "Sindrome_pre_excitacionV6M" "Otros_especificarV6M"                 "fecha_ecgV6M"
+PEP %>%
+  select(contains('V6M')) %>%
+  select(matches(test2)) %>%
+  mutate(PuntuaciónTotalV6M_UKU = PEP$PuntuaciónTotalV6M_UKU) %>%
+  select(-c(
+    prueba_embarazo_V6M:prueba_embarazo_resultado_V6M,
+    SGpreocupacionessomaticasV6M:Ociopracticardeporte23V6M,
+    V6M_Hemoglobina_glicosilada)) %>%
+  select(
+    gravedaddelaenfermedadV6M:PuntuaciónTotalFASTV6M, PuntuaciónTotalV6M_UKU, 
+    peso_V6M: V6M_Testosterona,
+    Presion_sistolica_V6M,Presion_diastolica_V6M,
+    everything()) %>%
+  names()
+
+#quitar "Sindrome_pre_excitacionV2M"           "Otros_especificarV2M"                 "fecha_ecgV2M"
+PEP %>%
+  select(matches(test2)) %>%
+  select(matches('V12M|V1A')) %>%
+  mutate(PuntuaciónTotalV1A_UKU  = PEP$PuntuaciónTotalV1A_UKU) %>%
+  select(-c(
+    prueba_embarazo_V1AÑO:prueba_embarazo_resultado_V1AÑO,
+    SGpreocupacionessomaticasV1A:Ociopracticardeporte23V1A,
+    V12M_Hemoglobina_glicosilada)) %>%
+  select(
+    gravedaddelaenfermedadV1A:PuntuaciónTotalFASTV1A, PuntuaciónTotalV1A_UKU, 
+    peso_V1AÑO: V12M_Testosterona,
+    Presion_sistolica_V1AÑO,Presion_diastolica_V1AÑO,
+    everything()) %>%
+  names()
+
+
 
 
