@@ -7,67 +7,58 @@ output:
     toc_float: yes
 ---
 
-# Notas de la preparacion de datos
-
-## Cosas hechas
-- Interesna los datos hasta el primer año **(desde basal a 1A)** (Se pierden demasiado casos en los dos años de proyecto)
-
-## Pendientes de hacer
-
-Cambia diccionario de variables para incluir las nuevas.
-
 # Notas del diccioanrio de variables
+
 ## Identificadores
 
-- Las variables **Lewis** son compliaciones obstetricas en el paciente (variables dicotomicas). LAs diferentes variables miden difernetes modos de compliaciones, interesan. Interesan conservarlos todas las variables. Esto son el compedio de todas las escalas, se pueden conservar y usar sin problemas
+- Las variables **Lewis** son compliaciones obstetricas en el paciente. Estas variables son binarias. LAs diferentes variables miden diferntes modos de compliaciones. Interesa conservar todas las variables.
 
-- Interesna 4 edades: 
-    - edad al inicio del estidio (fecha_entrevista - fecha_nacimiento )
-    - edad del diagnostico del primer episodio (fecha_primer_diagnostico - fecha_nacimiento)
-    - La diferencia entre primer diagnostico y inicio del estudio sería el tiempo con símptomas sin estar en el estudio **este tiempo debería de ser inferior a 1 año**. Puede estar en trarttamiento, y esto afecta a la detección de símptomas. (Efecto placebo, detectaremos mejoras en el estudio causadas por la mejora del tratatmeinto previo que se le dió.)
+- Interesan 5 edades: 
+    - LA edad al inicio del estidio (fecha_entrevista - fecha_nacimiento )
+    - La edad del diagnostico del primer episodio (fecha_primer_diagnostico - fecha_nacimiento)
     - La edad de la primera hospitalizacion (fecha_entrevista)
     - La edad de la estimacion de cuando comenzaron los simptomas.
-- etnia convertir a variable dicotomica: 0 caucasicos y 1 todos los demás.
+    - La diferencia de tiempo entre primer diagnostico y inicio del estudio. *Sería el tiempo con símptomas sin estar en el estudio* **este tiempo debería de ser inferior a 1 año**. Puede estar en tratamiento, y esto afecta a la detección de símptomas. (Efecto placebo, detectaremos mejoras en el estudio causadas por la mejora del tratatmeinto previo que se le dió.)
+    
+- Etnia: variable binaria: 0 caucasicos y 1 todos los demás.
 - El hecho de que la madre haya sido migrnate puede afectar (ser migrante afecta por que la madre puede tener factores estresante que se manifiestan en la preadolescencia. ) 
-- Convertir lugar_naci_pais a ina variable de posible inmigracion. Si españa, residente, resto inmigrante internacional.
+- Convertir lugar_naci_pais a variable de posible inmigracion. Si españa, residente, resto inmigrante internacional.
 - Se puede crear "provincia_naci" - "provincia_resid" y crear inmigrante nacional.
 - "estado_civil" y "convivencia" no interesan. *podríamos considerar que no convivencia tiene cierto factor por que la persona es funcional*
 - Conservar nivel_socioeconomico y nivel_urbanicidad como variable de interés. El nivel socioeconomico  es un conjunto de simptomas. Los entornos urbanos son más estresantes que los rurales. Area urbana esta sesgada por que reclutamos en areass urbanas, no rurales. **Hay sesgo en el proceso de reclutamiento, todos los controles vienen de la areas del exicample en cambio los casos reales pueden venir de cualquier rincón. Están desapareados.**
-- "antecedentes_psiquiatricos" "antecedentes_psiquiatricos_espe" "antecedentes_psicoticos" "antecedentes_psicoticos_espe" son variables desechables.
-- antecedentespsiquiátricos se queda, es el identificadores bueno. Es una simplificación De todo. Interesa una simplificación.
+- antecedentespsiquiátricos Es una simplificación De todo. 
 - PAS, ajuste premorbido: son las variables infanciaVB adolescenciatempranaVB adolescenciatardíaVB adultoVB generalVB puntuacionTotal_PAS_VB
 - DUP, tiempo en dias en el que han estado sin tratamiento psicotico.
-- DTP dias de psicosis trattada, (variable contraria a la DUP)
+- DTP dias de psicosis tratada, (variable contraria a la DUP)
 
 
  
-## historia familiar
+## Historia familiar
 
 - Descartar toda la seccion de  historia familiar del diccionario de variables 
 
 *causa de descarte*: (queda descartada por el contexto de que está todo resumido en la variable identificadora antecedentespsiquiátricos)
 
-
-
 ## Trastornos
 
 Tiene todo lo que recopila el crd (cuaderno de recogida de datos)
 
-causa de descarte No nos interesa esta seccion tampoco como variables. Eliminar todas las variables que contengan diagnostico y trastorno (expresion regular) de estas seccion en otras secciones. (seguramnete las secciones temporales llevan algunas de las que están aquí por como se han procesado.)
+**Causa de descarte:** No nos interesa esta seccion tampoco como variables. Eliminar todas las variables que contengan diagnostico y trastorno (expresion regular) de estas seccion en otras secciones. (seguramnete las secciones temporales llevan algunas de las que están aquí por como se han procesado.)
 
-*Causa de eliminación de esta seccion del diccionario*: 
+*Detalles*
 
-El clinico trabaja con dos escala SCID, i LA k-SADS (niño 7-17 años). Todos los items que están en esta sección vienen condicionados. Para hacer la selección de pacientes, el psiquiatra hace un diagnostico para la inclusión del apciente en el estudio. que luego igualmente está incluída aquí. Además se complica en la escala por que no suele acaabr de estar rellena por los psicólogos para recoger datos. 
+El clinico trabaja con dos escala SCID, i LA k-SADS (niño 7-17 años). Todos los items que están en esta sección vienen condicionados. Para hacer la selección de pacientes, el psiquiatra hace un diagnostico para la inclusión del paciente en el estudio, que luego igualmente está incluída aquí. 
+Además complica la escala por que no suele acabar de estar rellena por los psicólogos para recoger datos. 
 
 Además, estás variables se recogen cuando el diagnóstico está completamente asentado y bien definidido (normalmnete al final del estudio). En cambio apra este proyecto nos interesa lo basal, lo que hay comienzo del estudio, que es mucho más indefinido.
 
-# Crear otros bloques de diccioanrio de variables.
+
  
 ## Bloque de consumo de sustancias crear bloque de sustancias
 
-1283:1433
+variables de **PEP 1283:1433**. Interesan el consumo de sobretodo cannabis y cocaína.
 
-medir la persistencia del consumo (medir si está consumiendo cada visita)
+Medir la persistencia del consumo (medir si está consumiendo cada visita)
 
 ## Bloque farmacologico 
 
@@ -78,6 +69,8 @@ no todos los farmacos en farmacoX son antipsicoticos: solo aquellos que ya tiene
 posologia : dosis
 corpromacinna: dosis equivalentes de corpromacina (un suero utilizado como unidad de referencia para unas bases )
 **Hay que mantener la temporalidad**: extraer variables acorde a su momento en el tiempo para cadad paciente.
+
+farmacoX   : visita Basal
 farmacoX_A : visita a los 2 meses
 farmacoX_B : visita a los 6 meses
 farmacoX_C : visita a los 12 meses
@@ -89,7 +82,7 @@ farmacoX_C : visita a los 12 meses
 
 
 ### Blque de variables 2073:2129
-**Pendientes d ehacer por falta de código del antipsicótico**. está clasificado como números y desconocemos la relación númerica y del antipsicótico 
+**Pendientes de hacer por falta de código del antipsicótico**. está clasificado como números y desconocemos la relación númerica y del antipsicótico 
 medicion de niveles plasmaticos de antipsicoticos 
 antipsicotico nivel: parte del antipsicotico que está sin metabolizar
 antipsicotico activo: parte del antipsicotico que ha sido metabolizado.
@@ -99,7 +92,24 @@ mas adelante se crearán variables para la parte de principios activos metabolic
 
 
 
+farmaco
+ 
+# "extraccionVB","fecha_extraccionVB","contingenciasVB","antipsicoticoVB","antipsicotico_nivelVB","metabolito_activoVB",  
+# "antipsicotico2VB","antipsicotico_nivel2VB","metabolito_activo2VB","antipsicotico3VB","antipsicotico_nivel3VB","metabolito_activo3VB"    
 
+
+"antipsicoticoVB" = codigo
+"antipsicotico_nivelVB" = concentración plasmatico del farmaco el que hace su trabajo 
+"metabolito_activoVB" = concentración del farmaco metabolizao
+
+añadir 
+
+
+# categoría items de escalas con las conservaciones
+
+# añadir variables a entrevistas de 2 meses y 12 meses
+
+Estimacio_CI_baasal : Cognitive_reserve_global
 
 
 

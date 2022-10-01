@@ -3,18 +3,8 @@
 # Library load ----
 # ////////////////////////////////////////////////////////////////////////////////////////////////
 # ////////////////////////////////////////////////////////////////////////////////////////////////
-
-# Tidyverse es para cargar todo un conjunto de librerías para la programación funcional
-library(tidyverse)
-# haven habilita la conversión de datos de SPSS, además de que permite pasar facilmente de 
-# una variable double labelled a un factor.
-library(haven)
-# Habilita la función tidy y otras herramientas cómodas para el manejo de modelos
-library(broom)
-
-library(lubridate)
-
-library(readxl)
+if(!require('pacman')){install.packages('pacman')}
+pacman::p_load(tidyverse,haven, broom, lubridate, readxl)
 
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,7 +17,7 @@ library(readxl)
 PEP <- read_sav("Data/Definitive_PEPs.sav") %>%
   mutate_if(is.labelled,as_factor) %>%
   # añadimos la variable identificadora DTP, que está en el PEP DTP
-  inner_join(read_excel("Data/DTP_PEPs.xlsx"), by=c('ident_caso' = 'ID')  )
+  inner_join(read_excel("Data/PEPs.xlsx"), by=c('ident_caso' = 'ID')  )
 
 
 # /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -132,35 +122,13 @@ diccionario_variables <- list(
     "Inhalantesconsumo_V1AÑO"),
   'farma' = c(names(PEP)[1689:1772], names(PEP)[2073:2129]))
 
-# /////////////////////////////////////////////
-## Dimensiones del dataframe -----
-# /////////////////////////////////////////////
-
-# n <- dim(PEP)[1] # Numero de individuos
-# p <- dim(PEP)[2] # Numero de variables
-
-# /////////////////////////////////////////////
-## Numero de variables perdidas no classificadas de las 2548 iniciales -----
-# /////////////////////////////////////////////
-
-# Aun creando todo el diccionario de variables, no todas las variables son clasificadas adecuadamente
-# estas son las que quedarían por clasificar de alguna forma u otra.
-
-# p - diccionario_variables %>% map_dbl(~length(.x)) %>% sum()
-
-
-# ////////////////////////////////////////////////////////////////////////////////////////////////
-# Analitica descriptiva ----
-# ////////////////////////////////////////////////////////////////////////////////////////////////
-
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
-# Arreglo en variables indentificadoras ----
+## Arreglo en variables indentificadoras ----
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-PEP %>%
+PEP_identificadores <- PEP %>%
   select(any_of(diccionario_variables$identificadores)) %>%
   # Arreglamos las variables de complicaciones obstetricas a factor, no a numerica
   mutate(across(c('LewisA':'LewisT'), as.factor)) %>%
@@ -170,178 +138,236 @@ PEP %>%
     'edad_primera_hospitalizacion' = year(as.period(interval(fecha_nacimiento, fecha_1ªhospitalizacion_sint_psic_VB))),
     'edad_primer_diagnostico'      = year(as.period(interval(fecha_nacimiento, fecha_primer_diagnostico ))),
     'edad_estudio'                 = year(as.period(interval(fecha_nacimiento, fecha_entrevista))),) %>%
-  select(-c(fecha_nacimiento ,primera_entrevista, fecha_entrevista, fecha_primer_diagnostico,Iniciosíntomaspsicóticos_Fecha_estimacion_entrevistador)) %>%
+  select(-c(fecha_nacimiento ,
+            primera_entrevista, 
+            fecha_entrevista, 
+            fecha_primer_diagnostico,
+            Iniciosíntomaspsicóticos_Fecha_estimacion_entrevistador)) %>%
   # Modificamos la etnia para tener una sola dicotomica
   mutate(
-    etnia = case_when(
-      etnia == 'caucasian' ~ 'caucasian',
-      TRUE ~ 'others'),
+    etnia = case_when(etnia == 'caucasian' ~ 'caucasian', TRUE ~ 'others'),
     inmigrante= factor(case_when(
       lugar_naci_pais !='ESP' & !is.na(lugar_naci_pais)  ~ 'internacional',
-      as.character(provincia_naci) != as.character(provincia_resid) & 
-        lugar_naci_pais != 'Extranjero' &
-        (!is.na(provincia_naci) | !is.na(provincia_resid)) ~ 'Nacional',
-      TRUE~'No'))) %>%
+      as.character(provincia_naci) != as.character(provincia_resid) &  
+        lugar_naci_pais != 'Extranjero' & (!is.na(provincia_naci) | !is.na(provincia_resid)) ~ 'Nacional',
+      TRUE ~ 'No'))) %>%
   select(-c(lugar_naci_pais:nivel_ocupacional_progenitor, disponibilidad:antecedentes_psicoticos_espe )) %>%
   # Reordernar variables
-  select(ident_caso, tipo_sujeto, sexo, etnia, edad_estudio, edad_primer_episodio,edad_primer_diagnostico, edad_primera_hospitalizacion,inmigrante, everything()) 
+  select(ident_caso, tipo_sujeto, sexo, etnia, inmigrante,
+         edad_estudio, edad_primer_episodio,
+         edad_primer_diagnostico, edad_primera_hospitalizacion, everything()) 
+
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+## Arreglo en diccionario variables Farmacologicas ----
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+
+Farmacos_mal_etiquetados <- read_xlsx(path = 'Data/farmacos_mal_etiquetados_SM.xlsx') %>%
+  rename('P_actiu'= `Ppi actiu`)
+
+PEP_farma <- PEP %>% select(any_of(diccionario_variables$farma))
+
+PEP_farma_nombres <- PEP_farma %>% select(matches('^far')) 
+
+# incorporar suma de todas las corpromacinas
+
+limpiar_farmacos_maletiquetados <- function(columna_PEP_farma_nombres){
+  # recibimos un vector, lo convertimos a data frame para poder manejar nombre y tidyverse
+  columna_PEP_farma_nombres<- as.data.frame(columna_PEP_farma_nombres)
+  # Guardamos el nombre de la columna y le ponemos un nombre generico
+  save_name <- names(columna_PEP_farma_nombres)
+  names(columna_PEP_farma_nombres) <- 'Farmaco_X'
   
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-# Arreglo en diccionario variables Farmacologicas ----
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-
-
+  # Aplicamos join con los datos bien corregidos y luego cambiamos los datos orginales
+  columna_farmacos_limpios <- columna_PEP_farma_nombres %>%
+    left_join(., Farmacos_mal_etiquetados, by = c('Farmaco_X' = 'farmacos_mal_etiquetados')) %>%
+    mutate(Farmaco_X = case_when(
+      str_detect(Farmaco_X, pattern="^[[:digit:]]") == T ~ P_actiu, 
+      str_detect(Farmaco_X, pattern="^[[:digit:]]") == F ~ Farmaco_X)) %>%
+    select(Farmaco_X) %>%
+    unlist()
   
+  names(columna_farmacos_limpios) <- save_name
+  columna_farmacos_limpios<- as.character(columna_farmacos_limpios)
+  return(columna_farmacos_limpios)
+}
+
+PEP_farma_nombres_arreglados <- map(PEP_farma_nombres, limpiar_farmacos_maletiquetados) %>%
+  as_tibble() %>%
+  mutate_all(str_to_title) %>%
+  mutate_all(., list(~na_if(.,"")))
+
+PEP_farma[names(PEP_farma_nombres_arreglados)] <- PEP_farma_nombres_arreglados 
+
+# creamos una lista con los farmacos arreglado por momento en el experimento
+# Empezamos con la lista basal por que no tiene codigo de identificacion 
+# Luego añadimos las variables que contienen _A _B y _C (mediante expresion regular)
+# para poder limpiar tener todos los farmacos listos
+PEP_farma_times <- list(PEP_farma %>% select(farmaco1:CPZ5)) %>%
+  append(map(
+  list('_[:A:]','_[:B:]','_[:C:]' ), 
+  ~ PEP_farma %>% 
+    select(matches(.x)) %>%
+    select(-c(matches('^m'))))) %>%
+  set_names( c('PEP_farma_Basal','PEP_farma_A', 'PEP_farma_B', 'PEP_farma_C')) %>%
+  map2(list(
+    PEP_farma %>% select(CPZBASAL),
+    PEP_farma %>% select(CPZ2meses),
+    PEP_farma %>% select(CPZ6MESES),
+    PEP_farma %>% select(CPZ12MESES)),
+    ~ bind_cols(.x, .y)) 
+
+PEP_farma_times$PEP_farma_Basal
+
+
+# "extraccionVB","fecha_extraccionVB","contingenciasVB","antipsicoticoVB","antipsicotico_nivelVB","metabolito_activoVB",  
+# "antipsicotico2VB","antipsicotico_nivel2VB","metabolito_activo2VB","antipsicotico3VB","antipsicotico_nivel3VB","metabolito_activo3VB"    
+
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
-# Arreglo en diccionario variables toxicologicas ----
+## Arreglo en diccionario variables toxicologicas ----
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 
-PEP %>%
-  select(any_of(diccionario_variables$toxicos))
+PEP_toxicos <- PEP %>% select(any_of(diccionario_variables$toxicos))
 
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
-# Arreglo en diccionario variables Simtomatologicas de estado basal ----
+## Arreglo en diccionario variables Simtomatologicas de estado BASAL ----
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 
 # PEP basal, conservar variables en el diccioanrio de variables.
-PEP %>%
+PEP_basal <- PEP %>%
   select(
-  'GravedaddelaenfermedadVB',
-  'EEAGpuntuacionTotalVB',
-  'total_positivosVB',
-  'total_negativosVB',
-  'total_generalesVB',
-  'total_panssVB',
-  'YOUNGpuntuacionTotalVB',
-  'MADRSpuntuacionTotalVB',
-  'puntuacionTotalVB', #escala de tios de Valencia
-  'PuntuaciónTotalFASTVB',
-  "peso_VB",
-  "Presión_sistolica_VB",
-  "Presión_diastolica_VB","imc_VB", "perimetro_VB" ,
-  "BASAL_Hematocrito","BASAL_Hemoglobina","BASAL_Hematies","BASAL_VCM",
-  "BASAL_HCM","BASAL_CHCM","BASAL_Plaquetas","BASAL_VPM","BASAL_IDP","BASAL_Leucocitos_totales",
-  "BASAL_Eosinófilos_totales","BASAL_Basófilos_totales","BASAL_Linfocitos_totales",
-  "BASAL_Monocitos_totales","BASAL_Neutrofilos_totales","BASAL_Eritrosedimentación",
-  "BASAL_Glucosa_suero","BASAL_Creatinina_suero","BASAL_Sodio","BASAL_Potasio","BASAL_Calcio",
-  "BASAL_Fósforo","BASAL_Cloro","BASAL_Hemoglobina_glicosilada","BASAL_Trigliceridos",
-  "BASAL_Colesterol_total","BASAL_Colesterol_HDL","BASAL_Colesterol_LDL","BASAL_TSH",
-  "BASAL_T4_libre","BASAL_Prolactina","BASAL_Estradiol","BASAL_FSH","BASAL_Progesterona",
-  "BASAL_LH","BASAL_Testosterona","electroVB","anormalidadVB",
-  "Taquicardia_sinusalVB","Bradicardia_sinusalVB",
-  "Latido_supraventricular_prematuroVB","Latido_ventricular_prematuroVB",
-  "Hipertrofia_auricular_izquierdaVB","Taquicardia_supraventricularVB",
-  "Taquicardia_ventricularVB","Inversiones_simetricas_onda_TVB",
-  "Pobre_progresion_onda_RVB","Otros_específicos_ST_TVB",
-  "Bloqueo_completo_izquierdaVB","Bloqueo_completo_ramaderechaVB",
-  "Bloqueo_incompleto_rama_izquierdaVB","Bloqueo_incompleto_rama_derechaVB",
-  "Sindrome_pre_excitacionVB","Otros_especificarVB",
-  "fecha_ecgVB","lpmVB","qrsVB","prVB","qtVB") %>%
-  names()
-
-
+    'GravedaddelaenfermedadVB',
+    'EEAGpuntuacionTotalVB',
+    'total_positivosVB','total_negativosVB','total_generalesVB','total_panssVB',
+    'YOUNGpuntuacionTotalVB','MADRSpuntuacionTotalVB','PuntuaciónTotalFASTVB',
+    'puntuacionTotalVB', #escala de tios de Valencia
+    'peso_VB','imc_VB', 'perimetro_VB',
+    # Bioquimica
+    "BASAL_Hematocrito","BASAL_Hemoglobina","BASAL_Hematies","BASAL_VCM",
+    "BASAL_HCM","BASAL_CHCM","BASAL_Plaquetas","BASAL_VPM","BASAL_IDP","BASAL_Leucocitos_totales",
+    "BASAL_Eosinófilos_totales","BASAL_Basófilos_totales","BASAL_Linfocitos_totales",
+    "BASAL_Monocitos_totales","BASAL_Neutrofilos_totales","BASAL_Eritrosedimentación",
+    "BASAL_Glucosa_suero","BASAL_Creatinina_suero","BASAL_Sodio","BASAL_Potasio","BASAL_Calcio",
+    "BASAL_Fósforo","BASAL_Cloro","BASAL_Hemoglobina_glicosilada","BASAL_Trigliceridos",
+    "BASAL_Colesterol_total","BASAL_Colesterol_HDL","BASAL_Colesterol_LDL","BASAL_TSH",
+    "BASAL_T4_libre","BASAL_Prolactina","BASAL_Estradiol","BASAL_FSH",
+    "BASAL_Progesterona","BASAL_LH","BASAL_Testosterona",
+    # Cardio
+    "electroVB","Presión_sistolica_VB", "Presión_diastolica_VB","anormalidadVB",
+    "Taquicardia_sinusalVB","Bradicardia_sinusalVB","Hipertrofia_auricular_izquierdaVB",
+    "Latido_supraventricular_prematuroVB","Latido_ventricular_prematuroVB",
+    "Taquicardia_supraventricularVB","Taquicardia_ventricularVB",
+    "Inversiones_simetricas_onda_TVB","Pobre_progresion_onda_RVB",
+    "Bloqueo_incompleto_rama_derechaVB"  ,"Bloqueo_completo_ramaderechaVB",
+    "Bloqueo_incompleto_rama_izquierdaVB","Bloqueo_completo_izquierdaVB",
+    "lpmVB","qrsVB","prVB","qtVB")
 
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
-# Arreglo en diccionario variables Simtomatologicas de estado dos meses ----
+## Arreglo en diccionario variables Simtomatologicas de estado dos meses (2M) ----
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 
-# conservar variable mejoria global
+PEP_2M <- PEP %>%
+  select(contains('V2M')) %>%
+  select(matches( str_remove_all(names(PEP_basal),'_VB|BASAL_|VB'))) %>%
+  mutate(PuntuaciónTotalV2M_UKU = PEP$PuntuaciónTotalV2M_UKU) %>%
+  select(-c(
+    prueba_embarazo_V2M,
+    prueba_embarazo_resultado_V2M,
+    SGpreocupacionessomaticasV2M:Ociopracticardeporte23V2M,
+    aprenderaaprender_PDV2M: aprenderaaprender_PCV2M,
+    V2M_Hemoglobina_glicosilada,
+    Sindrome_pre_excitacionV2M)) %>%
+  select(gravedaddelaenfermedadV2M:PuntuaciónTotalFASTV2M, PuntuaciónTotalV2M_UKU, everything()) 
 
-#buscar las variables que contengan al final
-# variable SAS simpson agnus scale
-# variable UKU 
-
-
-
-test<- list(
-  #Escalas
-  'GravedaddelaenfermedadVB','EEAGpuntuacionTotalVB',
-  'total_positivosVB','total_negativosVB','total_generalesVB','total_panssVB',
-  'YOUNGpuntuacionTotalVB','MADRSpuntuacionTotalVB',
-  'puntuacionTotalVB', #escala de tios de Valencia
-  'PuntuaciónTotalFASTVB',
-  # Peso
-  "peso_VB","imc_VB", "perimetro_VB" ,
-  #Bioquimicas
-  "BASAL_Hematocrito","BASAL_Hemoglobina","BASAL_Hematies","BASAL_VCM",
-  "BASAL_HCM","BASAL_CHCM","BASAL_Plaquetas","BASAL_VPM","BASAL_IDP","BASAL_Leucocitos_totales",
-  "BASAL_Eosinófilos_totales","BASAL_Basófilos_totales","BASAL_Linfocitos_totales",
-  "BASAL_Monocitos_totales","BASAL_Neutrofilos_totales","BASAL_Eritrosedimentación",
-  "BASAL_Glucosa_suero","BASAL_Creatinina_suero","BASAL_Sodio","BASAL_Potasio","BASAL_Calcio",
-  "BASAL_Fósforo","BASAL_Cloro","BASAL_Hemoglobina_glicosilada","BASAL_Trigliceridos",
-  "BASAL_Colesterol_total","BASAL_Colesterol_HDL","BASAL_Colesterol_LDL","BASAL_TSH",
-  "BASAL_T4_libre","BASAL_Prolactina","BASAL_Estradiol","BASAL_FSH","BASAL_Progesterona",
-  "BASAL_LH","BASAL_Testosterona",
-  # Cardio
-  "Presión_sistolica_VB", "Presión_diastolica_VB","electroVB","anormalidadVB",
-  "Taquicardia_sinusalVB","Bradicardia_sinusalVB",
-  "Latido_supraventricular_prematuroVB","Latido_ventricular_prematuroVB",
-  "Hipertrofia_auricular_izquierdaVB","Inversiones_simetricas_onda_TVB",
-  "Taquicardia_supraventricularVB","Taquicardia_ventricularVB",
-  "Pobre_progresion_onda_RVB","Otros_específicos_ST_TVB",
-  "Bloqueo_completo_izquierdaVB","Bloqueo_completo_ramaderechaVB",
-  "Bloqueo_incompleto_rama_izquierdaVB","Bloqueo_incompleto_rama_derechaVB",
-  "Sindrome_pre_excitacionVB","Otros_especificarVB",
-  #Fechas y otras cosas
-  "fecha_ecgVB","lpmVB","qrsVB","prVB","qtVB")
-
-
-test2 <- str_remove_all(test, '_VB|BASAL_|VB')
-
-#quitar "Sindrome_pre_excitacionV2M","Otros_especificarV2M","fecha_ecgV2M"
-
+PEP_2M %>% names()
 
 PEP %>%
   select(contains('V2M')) %>%
-  select(matches(test2)) %>%
-  mutate(PuntuaciónTotalV2M_UKU = PEP$PuntuaciónTotalV2M_UKU) %>%
-  select(-c(
-    prueba_embarazo_V2M:Ociopracticardeporte23V2M,
-    aprenderaaprender_PDV2M: aprenderaaprender_PCV2M,
-    V2M_Hemoglobina_glicosilada)) %>%
-  select(gravedaddelaenfermedadV2M:PuntuaciónTotalFASTV2M, PuntuaciónTotalV2M_UKU, everything()) %>%
-  names()
+  select(matches( str_remove_all(names(PEP_basal),'_VB|BASAL_|VB'))) %>%
+  mutate(PuntuaciónTotalV2M_UKU = PEP$PuntuaciónTotalV2M_UKU) %>% names()
 
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+## Arreglo en diccionario variables Simtomatologicas de estado seis meses (6M) ----
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#quitar "Sindrome_pre_excitacionV6M" "Otros_especificarV6M"                 "fecha_ecgV6M"
-PEP %>%
+PEP_6M <- PEP %>%
   select(contains('V6M')) %>%
-  select(matches(test2)) %>%
+  select(matches( str_remove_all(names(PEP_basal),'_VB|BASAL_|VB'))) %>%
   mutate(PuntuaciónTotalV6M_UKU = PEP$PuntuaciónTotalV6M_UKU) %>%
-  select(-c(
+  select( -c(
     prueba_embarazo_V6M:prueba_embarazo_resultado_V6M,
-    SGpreocupacionessomaticasV6M:Ociopracticardeporte23V6M,
-    V6M_Hemoglobina_glicosilada)) %>%
+    SGpreocupacionessomaticasV6M:Sindrome_pre_excitacionV6M)) %>%
   select(
     gravedaddelaenfermedadV6M:PuntuaciónTotalFASTV6M, PuntuaciónTotalV6M_UKU, 
     peso_V6M: V6M_Testosterona,
     Presion_sistolica_V6M,Presion_diastolica_V6M,
-    everything()) %>%
-  names()
+    everything())
 
-#quitar "Sindrome_pre_excitacionV2M"           "Otros_especificarV2M"                 "fecha_ecgV2M"
+
+
+
 PEP %>%
-  select(matches(test2)) %>%
-  select(matches('V12M|V1A')) %>%
+  select(contains('V6M')) %>%
+  select(matches( str_remove_all(names(PEP_basal),'_VB|BASAL_|VB'))) %>%
+  mutate(PuntuaciónTotalV6M_UKU = PEP$PuntuaciónTotalV6M_UKU) %>% names()
+
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+## Arreglo en diccionario variables Simtomatologicas de estado doce meses (12M) ----
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+
+PEP_12M <- PEP %>%
+  select(matches('1A|12M') ) %>%
+  select(matches( str_remove_all(names(PEP_basal),'_VB|BASAL_|VB'))) %>%
   mutate(PuntuaciónTotalV1A_UKU  = PEP$PuntuaciónTotalV1A_UKU) %>%
   select(-c(
     prueba_embarazo_V1AÑO:prueba_embarazo_resultado_V1AÑO,
     SGpreocupacionessomaticasV1A:Ociopracticardeporte23V1A,
-    V12M_Hemoglobina_glicosilada)) %>%
+    V12M_Hemoglobina_glicosilada,
+    Sindrome_pre_excitacionV1A)) %>%
   select(
     gravedaddelaenfermedadV1A:PuntuaciónTotalFASTV1A, PuntuaciónTotalV1A_UKU, 
     peso_V1AÑO: V12M_Testosterona,
     Presion_sistolica_V1AÑO,Presion_diastolica_V1AÑO,
-    everything()) %>%
-  names()
+    everything())
+
+
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# Armamento del dataframe final ----
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+
+variables_finales <- pmap(
+  list(
+    list(PEP_identificadores[,-1],
+         PEP_basal,PEP_2M,PEP_6M,PEP_12M,
+         PEP_farma_times$PEP_farma_A,PEP_farma_times$PEP_farma_B,PEP_farma_times$PEP_farma_C,
+         PEP_toxicos),
+    list('Identificadores',
+         'Entrevista_basal','Entrevista_2M','Entrevista_6M','Entrevista_12M',
+         'Farmacos_2M','Farmacos_6M','Farmacos_12M',
+         'Toxicos')),
+  ~ tibble( ident_caso = PEP_identificadores[,1]) %>%
+    bind_cols(..1) %>%
+    nest(-c(ident_caso),.key= ..2)) %>%
+  reduce(inner_join, by = "ident_caso")
+
+#rm(list = setdiff(ls(), c('variables_finales','diccionario_variables')) )
+
+
+# buscar que nombres son diferentes y por que fallan nombres 
+
 
 
 
