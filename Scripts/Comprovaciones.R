@@ -64,10 +64,3 @@ Sumario_variables_diccionario <- diccionario_variables %>%
 
 Sumario_variables_diccionario$identificadores$resumen_variables
 
-
-
-
-
-
-
-

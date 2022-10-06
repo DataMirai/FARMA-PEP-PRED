@@ -157,72 +157,6 @@ PEP_identificadores <- PEP %>%
          edad_estudio, edad_primer_episodio,
          edad_primer_diagnostico, edad_primera_hospitalizacion, everything()) 
 
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-## Arreglo en diccionario variables Farmacologicas ----
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-
-Farmacos_mal_etiquetados <- read_xlsx(path = 'Data/farmacos_mal_etiquetados_SM.xlsx') %>%
-  rename('P_actiu'= `Ppi actiu`)
-
-PEP_farma <- PEP %>% select(any_of(diccionario_variables$farma))
-
-PEP_farma_nombres <- PEP_farma %>% select(matches('^far')) 
-
-# incorporar suma de todas las corpromacinas
-
-limpiar_farmacos_maletiquetados <- function(columna_PEP_farma_nombres){
-  # recibimos un vector, lo convertimos a data frame para poder manejar nombre y tidyverse
-  columna_PEP_farma_nombres<- as.data.frame(columna_PEP_farma_nombres)
-  # Guardamos el nombre de la columna y le ponemos un nombre generico
-  save_name <- names(columna_PEP_farma_nombres)
-  names(columna_PEP_farma_nombres) <- 'Farmaco_X'
-  
-  # Aplicamos join con los datos bien corregidos y luego cambiamos los datos orginales
-  columna_farmacos_limpios <- columna_PEP_farma_nombres %>%
-    left_join(., Farmacos_mal_etiquetados, by = c('Farmaco_X' = 'farmacos_mal_etiquetados')) %>%
-    mutate(Farmaco_X = case_when(
-      str_detect(Farmaco_X, pattern="^[[:digit:]]") == T ~ P_actiu, 
-      str_detect(Farmaco_X, pattern="^[[:digit:]]") == F ~ Farmaco_X)) %>%
-    select(Farmaco_X) %>%
-    unlist()
-  
-  names(columna_farmacos_limpios) <- save_name
-  columna_farmacos_limpios<- as.character(columna_farmacos_limpios)
-  return(columna_farmacos_limpios)
-}
-
-PEP_farma_nombres_arreglados <- map(PEP_farma_nombres, limpiar_farmacos_maletiquetados) %>%
-  as_tibble() %>%
-  mutate_all(str_to_title) %>%
-  mutate_all(., list(~na_if(.,"")))
-
-PEP_farma[names(PEP_farma_nombres_arreglados)] <- PEP_farma_nombres_arreglados 
-
-# creamos una lista con los farmacos arreglado por momento en el experimento
-# Empezamos con la lista basal por que no tiene codigo de identificacion 
-# Luego añadimos las variables que contienen _A _B y _C (mediante expresion regular)
-# para poder limpiar tener todos los farmacos listos
-PEP_farma_times <- list(PEP_farma %>% select(farmaco1:CPZ5)) %>%
-  append(map(
-  list('_[:A:]','_[:B:]','_[:C:]' ), 
-  ~ PEP_farma %>% 
-    select(matches(.x)) %>%
-    select(-c(matches('^m'))))) %>%
-  set_names( c('PEP_farma_Basal','PEP_farma_A', 'PEP_farma_B', 'PEP_farma_C')) %>%
-  map2(list(
-    PEP_farma %>% select(CPZBASAL),
-    PEP_farma %>% select(CPZ2meses),
-    PEP_farma %>% select(CPZ6MESES),
-    PEP_farma %>% select(CPZ12MESES)),
-    ~ bind_cols(.x, .y)) 
-
-PEP_farma_times$PEP_farma_Basal
-
-
-# "extraccionVB","fecha_extraccionVB","contingenciasVB","antipsicoticoVB","antipsicotico_nivelVB","metabolito_activoVB",  
-# "antipsicotico2VB","antipsicotico_nivel2VB","metabolito_activo2VB","antipsicotico3VB","antipsicotico_nivel3VB","metabolito_activo3VB"    
 
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -239,7 +173,7 @@ PEP_toxicos <- PEP %>% select(any_of(diccionario_variables$toxicos))
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 
 # PEP basal, conservar variables en el diccioanrio de variables.
-PEP_basal <- PEP %>%
+PEP_VB_entrevista <- PEP %>%
   select(
     'GravedaddelaenfermedadVB',
     'EEAGpuntuacionTotalVB',
@@ -273,9 +207,9 @@ PEP_basal <- PEP %>%
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 
-PEP_2M <- PEP %>%
+PEP_2M_entrevista <- PEP %>%
   select(contains('V2M')) %>%
-  select(matches( str_remove_all(names(PEP_basal),'_VB|BASAL_|VB'))) %>%
+  select(matches( str_remove_all(names(PEP_VB_entrevista),'_VB|BASAL_|VB'))) %>%
   mutate(PuntuaciónTotalV2M_UKU = PEP$PuntuaciónTotalV2M_UKU) %>%
   select(-c(
     prueba_embarazo_V2M,
@@ -286,11 +220,9 @@ PEP_2M <- PEP %>%
     Sindrome_pre_excitacionV2M)) %>%
   select(gravedaddelaenfermedadV2M:PuntuaciónTotalFASTV2M, PuntuaciónTotalV2M_UKU, everything()) 
 
-PEP_2M %>% names()
-
 PEP %>%
   select(contains('V2M')) %>%
-  select(matches( str_remove_all(names(PEP_basal),'_VB|BASAL_|VB'))) %>%
+  select(matches( str_remove_all(names(PEP_VB_entrevista),'_VB|BASAL_|VB'))) %>%
   mutate(PuntuaciónTotalV2M_UKU = PEP$PuntuaciónTotalV2M_UKU) %>% names()
 
 # /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -299,9 +231,9 @@ PEP %>%
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 
-PEP_6M <- PEP %>%
+PEP_6M_entrevista <- PEP %>%
   select(contains('V6M')) %>%
-  select(matches( str_remove_all(names(PEP_basal),'_VB|BASAL_|VB'))) %>%
+  select(matches( str_remove_all(names(PEP_VB_entrevista),'_VB|BASAL_|VB'))) %>%
   mutate(PuntuaciónTotalV6M_UKU = PEP$PuntuaciónTotalV6M_UKU) %>%
   select( -c(
     prueba_embarazo_V6M:prueba_embarazo_resultado_V6M,
@@ -312,12 +244,9 @@ PEP_6M <- PEP %>%
     Presion_sistolica_V6M,Presion_diastolica_V6M,
     everything())
 
-
-
-
 PEP %>%
   select(contains('V6M')) %>%
-  select(matches( str_remove_all(names(PEP_basal),'_VB|BASAL_|VB'))) %>%
+  select(matches( str_remove_all(names(PEP_VB_entrevista),'_VB|BASAL_|VB'))) %>%
   mutate(PuntuaciónTotalV6M_UKU = PEP$PuntuaciónTotalV6M_UKU) %>% names()
 
 # /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -326,9 +255,9 @@ PEP %>%
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 
-PEP_12M <- PEP %>%
+PEP_12M_entrevista <- PEP %>%
   select(matches('1A|12M') ) %>%
-  select(matches( str_remove_all(names(PEP_basal),'_VB|BASAL_|VB'))) %>%
+  select(matches( str_remove_all(names(PEP_VB_entrevista),'_VB|BASAL_|VB'))) %>%
   mutate(PuntuaciónTotalV1A_UKU  = PEP$PuntuaciónTotalV1A_UKU) %>%
   select(-c(
     prueba_embarazo_V1AÑO:prueba_embarazo_resultado_V1AÑO,
@@ -342,33 +271,54 @@ PEP_12M <- PEP %>%
     everything())
 
 
+
+clear
+
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# Importación de datos de farmacologia limpios (script Aux_limpieza_farmaco) ----
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+# /////////////////////////////////////////////////////////////////////////////////////////////////
+
+source('Scripts/2_limpieza_PEP_farmaco.R')
+
+rm(list=setdiff(
+  ls(),
+  c('PEP',
+    'diccionario_variables',
+    'PEP_identificadores',
+    'PEP_VB_entrevista',
+    'PEP_2M_entrevista',
+    'PEP_6M_entrevista',
+    'PEP_12M_entrevista',
+    'PEP_toxicos',
+    'PEP_VB_farma',
+    'PEP_2M_farma',
+    'PEP_6M_farma',
+    'PEP_12M_farma')))
+
+
+
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # Armamento del dataframe final ----
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 
-variables_finales <- pmap(
-  list(
-    list(PEP_identificadores[,-1],
-         PEP_basal,PEP_2M,PEP_6M,PEP_12M,
-         PEP_farma_times$PEP_farma_A,PEP_farma_times$PEP_farma_B,PEP_farma_times$PEP_farma_C,
-         PEP_toxicos),
-    list('Identificadores',
-         'Entrevista_basal','Entrevista_2M','Entrevista_6M','Entrevista_12M',
-         'Farmacos_2M','Farmacos_6M','Farmacos_12M',
-         'Toxicos')),
-  ~ tibble( ident_caso = PEP_identificadores[,1]) %>%
-    bind_cols(..1) %>%
-    nest(-c(ident_caso),.key= ..2)) %>%
-  reduce(inner_join, by = "ident_caso")
-
-#rm(list = setdiff(ls(), c('variables_finales','diccionario_variables')) )
-
-
-# buscar que nombres son diferentes y por que fallan nombres 
-
-
-
-
+# PEP_Final <- pmap(
+#   list(
+#     list(PEP_identificadores[,-1],
+#          PEP_VB_entrevista,
+#          PEP_2M_entrevista,
+#          PEP_6M_entrevista,
+#          PEP_12M_entrevista,
+#          PEP_toxicos),
+#     list('Identificadores',
+#          'Entrevista_basal','Entrevista_2M','Entrevista_6M','Entrevista_12M',
+#          'Farmacos_2M','Farmacos_6M','Farmacos_12M',
+#          'Toxicos')),
+#   ~ tibble( ident_caso = PEP_identificadores[,1]) %>%
+#     bind_cols(..1) %>%
+#     nest(-c(ident_caso),.key= ..2)) %>%
+#   reduce(inner_join, by = "ident_caso")
 
