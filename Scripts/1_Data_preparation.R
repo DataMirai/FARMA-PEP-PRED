@@ -17,7 +17,18 @@ pacman::p_load(tidyverse,haven, broom, lubridate, readxl)
 PEP <- read_sav("Data/Definitive_PEPs.sav") %>%
   mutate_if(is.labelled,as_factor) %>%
   # añadimos la variable identificadora DTP, que está en el PEP DTP
-  inner_join(read_excel("Data/PEPs.xlsx"), by=c('ident_caso' = 'ID')  )
+  inner_join(read_excel("Data/PEPs.xlsx"), by=c('ident_caso' = 'ID')) %>%
+  inner_join(. , PEP_extras, by=c('ident_caso'='Case_identification'))
+
+
+PEP_extras <- read_excel('Data/BBDD_PEPs_Extras.xlsx') 
+
+PEP_genetica <- left_join(
+  as.data.frame(PEP$ident_caso) %>% rename('ident_caso'= 'PEP$ident_caso'),
+  read_excel('Data/PEP_PRS.xlsx'),
+  by= c('ident_caso'='EXCEL') ) %>% as_tibble()
+
+PEP_extras %>% names()
 
 
 # /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,6 +71,7 @@ PEP <- read_sav("Data/Definitive_PEPs.sav") %>%
 #   'encefalo' = names(PEP)[2421:2548])
 
 diccionario_variables <- list(
+  
   'identificadores' = c(
     names(PEP)[1:27],
     names(PEP)[c(1285,1291,1297,1303)],
@@ -68,13 +80,19 @@ diccionario_variables <- list(
     'antecedentes_psiquiatricos','antecedentes_psiquiatricos_espe','antecedentes_psicoticos','antecedentes_psicoticos_espe',
     'fecha_primer_diagnostico','fecha_1ªhospitalizacion_sint_psic_VB','Iniciosíntomaspsicóticos_Fecha_estimacion_entrevistador',
     'infanciaVB', 'adolescenciatempranaVB', 'adolescenciatardíaVB',' adultoVB','generalVB', 'puntuacionTotal_PAS_VB',
-    'DUP','DTP'),
-  'mediciones_Basal'  = str_subset(names(PEP), 'VB|BASAL'),
+    'DUP','DTP',
+    'ESTIMATION_CI','ATENTION','WORKING_MEMORY',
+    'VERBAL_MEMOR','EXECUTIVE_FUNCTION','COMPOSITE_SCORE',
+    'PNS_DEFINITIVA','COGNITIVE_RESERVE'),
+  
+  'mediciones_Basal'  = str_subset(names(PEP),'VB|BASAL'),
   'mediciones_2M'     = str_subset(names(PEP),'V2M'),
-  'mediciones_6M'     = str_subset(names(PEP), 'V6M'),
-  'mediciones_1A'     = str_subset(names(PEP), 'V1A|V12M '),
-  'mediciones_2A'     = str_subset(names(PEP), 'V2A|V24M'),
+  'mediciones_6M'     = str_subset(names(PEP),'V6M'),
+  'mediciones_1A'     = str_subset(names(PEP),'V1A|V12M '),
+  'mediciones_2A'     = str_subset(names(PEP),'V2A|V24M'),
+  
   'encefalo' = names(PEP)[2421:2548],
+  
   'toxicos' = c(
     "ConsumoTabaco_VB",           
     "ConsumoAlcohol_VB",     
@@ -120,6 +138,7 @@ diccionario_variables <- list(
     "Metadonaconsumo_V1AÑO",
     "Otrosopiaceosconsumo_V1AÑO",
     "Inhalantesconsumo_V1AÑO"),
+  
   'farma' = c(names(PEP)[1689:1772], names(PEP)[2073:2129]))
 
 # /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -138,11 +157,6 @@ PEP_identificadores <- PEP %>%
     'edad_primera_hospitalizacion' = year(as.period(interval(fecha_nacimiento, fecha_1ªhospitalizacion_sint_psic_VB))),
     'edad_primer_diagnostico'      = year(as.period(interval(fecha_nacimiento, fecha_primer_diagnostico ))),
     'edad_estudio'                 = year(as.period(interval(fecha_nacimiento, fecha_entrevista))),) %>%
-  select(-c(fecha_nacimiento ,
-            primera_entrevista, 
-            fecha_entrevista, 
-            fecha_primer_diagnostico,
-            Iniciosíntomaspsicóticos_Fecha_estimacion_entrevistador)) %>%
   # Modificamos la etnia para tener una sola dicotomica
   mutate(
     etnia = case_when(etnia == 'caucasian' ~ 'caucasian', TRUE ~ 'others'),
@@ -151,12 +165,14 @@ PEP_identificadores <- PEP %>%
       as.character(provincia_naci) != as.character(provincia_resid) &  
         lugar_naci_pais != 'Extranjero' & (!is.na(provincia_naci) | !is.na(provincia_resid)) ~ 'Nacional',
       TRUE ~ 'No'))) %>%
-  select(-c(lugar_naci_pais:nivel_ocupacional_progenitor, disponibilidad:antecedentes_psicoticos_espe )) %>%
+  select(-c(
+    fecha_nacimiento ,primera_entrevista, fecha_entrevista, fecha_primer_diagnostico,
+    Iniciosíntomaspsicóticos_Fecha_estimacion_entrevistador,
+    lugar_naci_pais:nivel_ocupacional_progenitor, disponibilidad:antecedentes_psicoticos_espe )) %>%
   # Reordernar variables
   select(ident_caso, tipo_sujeto, sexo, etnia, inmigrante,
          edad_estudio, edad_primer_episodio,
          edad_primer_diagnostico, edad_primera_hospitalizacion, everything()) 
-
 
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -175,8 +191,8 @@ PEP_toxicos <- PEP %>% select(any_of(diccionario_variables$toxicos))
 # PEP basal, conservar variables en el diccioanrio de variables.
 PEP_VB_entrevista <- PEP %>%
   select(
-    'GravedaddelaenfermedadVB',
-    'EEAGpuntuacionTotalVB',
+    'PSFS_VB', 'NSFS_VB','PNS_VB','MAP_VB','EXP_VB',
+    'GravedaddelaenfermedadVB','EEAGpuntuacionTotalVB',
     'total_positivosVB','total_negativosVB','total_generalesVB','total_panssVB',
     'YOUNGpuntuacionTotalVB','MADRSpuntuacionTotalVB','PuntuaciónTotalFASTVB',
     'puntuacionTotalVB', #escala de tios de Valencia
@@ -201,6 +217,7 @@ PEP_VB_entrevista <- PEP %>%
     "Bloqueo_incompleto_rama_izquierdaVB","Bloqueo_completo_izquierdaVB",
     "lpmVB","qrsVB","prVB","qtVB")
 
+
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 ## Arreglo en diccionario variables Simtomatologicas de estado dos meses (2M) ----
@@ -212,18 +229,18 @@ PEP_2M_entrevista <- PEP %>%
   select(matches( str_remove_all(names(PEP_VB_entrevista),'_VB|BASAL_|VB'))) %>%
   mutate(PuntuaciónTotalV2M_UKU = PEP$PuntuaciónTotalV2M_UKU) %>%
   select(-c(
+    TristezaExpresadaV2M,
+    expresividadV2M,
+    expresividad_tipicaV2M,
     prueba_embarazo_V2M,
     prueba_embarazo_resultado_V2M,
     SGpreocupacionessomaticasV2M:Ociopracticardeporte23V2M,
-    aprenderaaprender_PDV2M: aprenderaaprender_PCV2M,
-    V2M_Hemoglobina_glicosilada,
+    aprenderaaprender_PDV2M:aprenderaaprender_PCV2M,
     Sindrome_pre_excitacionV2M)) %>%
-  select(gravedaddelaenfermedadV2M:PuntuaciónTotalFASTV2M, PuntuaciónTotalV2M_UKU, everything()) 
-
-PEP %>%
-  select(contains('V2M')) %>%
-  select(matches( str_remove_all(names(PEP_VB_entrevista),'_VB|BASAL_|VB'))) %>%
-  mutate(PuntuaciónTotalV2M_UKU = PEP$PuntuaciónTotalV2M_UKU) %>% names()
+  select(PSFS_V2M,NSFS_V2M,
+         gravedaddelaenfermedadV2M:PuntuaciónTotalFASTV2M, 
+         PuntuaciónTotalV2M_UKU, 
+         everything()) 
 
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -236,19 +253,21 @@ PEP_6M_entrevista <- PEP %>%
   select(matches( str_remove_all(names(PEP_VB_entrevista),'_VB|BASAL_|VB'))) %>%
   mutate(PuntuaciónTotalV6M_UKU = PEP$PuntuaciónTotalV6M_UKU) %>%
   select( -c(
+    TristezaExpresadaV6M,expresividadV6M,                     
+    expresividad_tipicaV6M,
     prueba_embarazo_V6M:prueba_embarazo_resultado_V6M,
     SGpreocupacionessomaticasV6M:Sindrome_pre_excitacionV6M)) %>%
   select(
+    PSFS_V6M,NSFS_V6M,PNS_V6M,
     gravedaddelaenfermedadV6M:PuntuaciónTotalFASTV6M, PuntuaciónTotalV6M_UKU, 
     peso_V6M: V6M_Testosterona,
     Presion_sistolica_V6M,Presion_diastolica_V6M,
     everything())
 
-PEP %>%
-  select(contains('V6M')) %>%
-  select(matches( str_remove_all(names(PEP_VB_entrevista),'_VB|BASAL_|VB'))) %>%
-  mutate(PuntuaciónTotalV6M_UKU = PEP$PuntuaciónTotalV6M_UKU) %>% names()
 
+names(PEP_extras)
+names(PEP_2M_entrevista)
+names(PEP_6M_entrevista)
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 ## Arreglo en diccionario variables Simtomatologicas de estado doce meses (12M) ----
@@ -260,19 +279,17 @@ PEP_12M_entrevista <- PEP %>%
   select(matches( str_remove_all(names(PEP_VB_entrevista),'_VB|BASAL_|VB'))) %>%
   mutate(PuntuaciónTotalV1A_UKU  = PEP$PuntuaciónTotalV1A_UKU) %>%
   select(-c(
+    TristezaExpresadaV1A,expresividadV1A,expresividad_tipicaV1A,
     prueba_embarazo_V1AÑO:prueba_embarazo_resultado_V1AÑO,
     SGpreocupacionessomaticasV1A:Ociopracticardeporte23V1A,
-    V12M_Hemoglobina_glicosilada,
     Sindrome_pre_excitacionV1A)) %>%
   select(
+    PSFS_V12M:PuntuacionTotalV1A_SAS,
     gravedaddelaenfermedadV1A:PuntuaciónTotalFASTV1A, PuntuaciónTotalV1A_UKU, 
     peso_V1AÑO: V12M_Testosterona,
     Presion_sistolica_V1AÑO,Presion_diastolica_V1AÑO,
     everything())
 
-
-
-clear
 
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -280,45 +297,34 @@ clear
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 
-source('Scripts/2_limpieza_PEP_farmaco.R')
+# source('Scripts/2_limpieza_PEP_farmaco.R')
+# 
+# rm(list=setdiff(
+#   ls(),
+#   c('PEP',
+#     'diccionario_variables',
+#     'PEP_identificadores',
+#     'PEP_VB_entrevista',
+#     'PEP_2M_entrevista',
+#     'PEP_6M_entrevista',
+#     'PEP_12M_entrevista',
+#     'PEP_toxicos',
+#     'PEP_VB_farma',
+#     'PEP_2M_farma',
+#     'PEP_6M_farma',
+#     'PEP_12M_farma')))
 
-rm(list=setdiff(
-  ls(),
-  c('PEP',
-    'diccionario_variables',
-    'PEP_identificadores',
-    'PEP_VB_entrevista',
-    'PEP_2M_entrevista',
-    'PEP_6M_entrevista',
-    'PEP_12M_entrevista',
-    'PEP_toxicos',
-    'PEP_VB_farma',
-    'PEP_2M_farma',
-    'PEP_6M_farma',
-    'PEP_12M_farma')))
 
 
 
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-# Armamento del dataframe final ----
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-# /////////////////////////////////////////////////////////////////////////////////////////////////
 
-# PEP_Final <- pmap(
-#   list(
-#     list(PEP_identificadores[,-1],
-#          PEP_VB_entrevista,
-#          PEP_2M_entrevista,
-#          PEP_6M_entrevista,
-#          PEP_12M_entrevista,
-#          PEP_toxicos),
-#     list('Identificadores',
-#          'Entrevista_basal','Entrevista_2M','Entrevista_6M','Entrevista_12M',
-#          'Farmacos_2M','Farmacos_6M','Farmacos_12M',
-#          'Toxicos')),
-#   ~ tibble( ident_caso = PEP_identificadores[,1]) %>%
-#     bind_cols(..1) %>%
-#     nest(-c(ident_caso),.key= ..2)) %>%
-#   reduce(inner_join, by = "ident_caso")
+
+
+
+
+
+
+
+
+
 

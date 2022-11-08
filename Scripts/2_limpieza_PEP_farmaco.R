@@ -245,7 +245,7 @@ PEP_VB_farma <- map2_dfc(
     ~ .x %>% modify_at(1:5,function(x) str_count(.y,x) )%>% rowSums(., na.rm=T)  ) %>%
   set_names(aux_VB$tipo_farmaco) %>% # <--- aux cambio !
   rename_all( ~ paste0('N_',.,'_VB')) %>%
-  mutate(N_total_farmacos = rowSums(. )) %>%
+  mutate(N_total_farmacos_VB = rowSums(. )) %>%
   # ///////////
   bind_cols(PEP_farma_farmacos_VB) %>%   # <--- Cambio de nombre !
   mutate(
@@ -276,7 +276,7 @@ PEP_2M_farma <- map2_dfc(
   ~ .x %>% modify_at(1:5,function(x) str_count(.y,x) )%>% rowSums(., na.rm=T)  ) %>%
   set_names(aux_2M$tipo_farmaco) %>% # <--- aux cambio !
   rename_all( ~ paste0('N_',.,'_2M')) %>%
-  mutate(N_total_farmacos = rowSums(. )) %>%
+  mutate(N_total_farmacos_2M = rowSums(. )) %>%
   # ///////////
   bind_cols(PEP_farma_farmacos_2M) %>%   # <--- Cambio de nombre !
   mutate(
@@ -288,6 +288,7 @@ PEP_2M_farma <- map2_dfc(
     posologia_total_2M, # <--- Cambio de nombre !
     CPZ_total_2M) %>%   # <--- Cambio de nombre !
   mutate_if(is.character, str_to_title ) 
+
 
 # ////////////////////////////////////////////////////////////////////////////////////
 # FINAL 6M -----
@@ -306,7 +307,7 @@ PEP_6M_farma <- map2_dfc(
   ~ .x %>% modify_at(1:5,function(x) str_count(.y,x) )%>% rowSums(., na.rm=T)  ) %>%
   set_names(aux_6M$tipo_farmaco) %>%     # <---  Cambio de auxiliar !
   rename_all( ~ paste0('N_',.,'6M')) %>%
-  mutate(N_total_farmacos = rowSums(. )) %>%
+  mutate(N_total_farmacos_6M = rowSums(. )) %>%
   # ///////////
   bind_cols(PEP_farma_farmacos_6M) %>%   # <--- Cambio de nombre !
   mutate(
@@ -338,7 +339,7 @@ PEP_12M_farma <- map2_dfc(
   ~ .x %>% modify_at(1:5,function(x) str_count(.y,x) )%>% rowSums(., na.rm=T)  ) %>%
   set_names(aux_12M$tipo_farmaco) %>%     # <---  Cambio de auxiliar !
   rename_all( ~ paste0('N_',.,'12M')) %>%
-  mutate(N_total_farmacos = rowSums(. )) %>%
+  mutate(N_total_farmacos_12M = rowSums(. )) %>%
   # ///////////
   bind_cols(PEP_farma_farmacos_12M) %>%   # <--- Cambio de nombre !
   mutate(
