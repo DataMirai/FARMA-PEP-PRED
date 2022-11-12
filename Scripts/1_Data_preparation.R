@@ -17,18 +17,7 @@ pacman::p_load(tidyverse,haven, broom, lubridate, readxl)
 PEP <- read_sav("Data/Definitive_PEPs.sav") %>%
   mutate_if(is.labelled,as_factor) %>%
   # añadimos la variable identificadora DTP, que está en el PEP DTP
-  inner_join(read_excel("Data/PEPs.xlsx"), by=c('ident_caso' = 'ID')) %>%
-  inner_join(. , PEP_extras, by=c('ident_caso'='Case_identification'))
-
-
-PEP_extras <- read_excel('Data/BBDD_PEPs_Extras.xlsx') 
-
-PEP_genetica <- left_join(
-  as.data.frame(PEP$ident_caso) %>% rename('ident_caso'= 'PEP$ident_caso'),
-  read_excel('Data/PEP_PRS.xlsx'),
-  by= c('ident_caso'='EXCEL') ) %>% as_tibble()
-
-PEP_extras %>% names()
+  inner_join(read_excel("Data/PEPs.xlsx"), by=c('ident_caso' = 'ID')) 
 
 
 # /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -80,10 +69,7 @@ diccionario_variables <- list(
     'antecedentes_psiquiatricos','antecedentes_psiquiatricos_espe','antecedentes_psicoticos','antecedentes_psicoticos_espe',
     'fecha_primer_diagnostico','fecha_1ªhospitalizacion_sint_psic_VB','Iniciosíntomaspsicóticos_Fecha_estimacion_entrevistador',
     'infanciaVB', 'adolescenciatempranaVB', 'adolescenciatardíaVB',' adultoVB','generalVB', 'puntuacionTotal_PAS_VB',
-    'DUP','DTP',
-    'ESTIMATION_CI','ATENTION','WORKING_MEMORY',
-    'VERBAL_MEMOR','EXECUTIVE_FUNCTION','COMPOSITE_SCORE',
-    'PNS_DEFINITIVA','COGNITIVE_RESERVE'),
+    'DUP','DTP'),
   
   'mediciones_Basal'  = str_subset(names(PEP),'VB|BASAL'),
   'mediciones_2M'     = str_subset(names(PEP),'V2M'),
@@ -191,7 +177,6 @@ PEP_toxicos <- PEP %>% select(any_of(diccionario_variables$toxicos))
 # PEP basal, conservar variables en el diccioanrio de variables.
 PEP_VB_entrevista <- PEP %>%
   select(
-    'PSFS_VB', 'NSFS_VB','PNS_VB','MAP_VB','EXP_VB',
     'GravedaddelaenfermedadVB','EEAGpuntuacionTotalVB',
     'total_positivosVB','total_negativosVB','total_generalesVB','total_panssVB',
     'YOUNGpuntuacionTotalVB','MADRSpuntuacionTotalVB','PuntuaciónTotalFASTVB',
@@ -229,16 +214,12 @@ PEP_2M_entrevista <- PEP %>%
   select(matches( str_remove_all(names(PEP_VB_entrevista),'_VB|BASAL_|VB'))) %>%
   mutate(PuntuaciónTotalV2M_UKU = PEP$PuntuaciónTotalV2M_UKU) %>%
   select(-c(
-    TristezaExpresadaV2M,
-    expresividadV2M,
-    expresividad_tipicaV2M,
     prueba_embarazo_V2M,
     prueba_embarazo_resultado_V2M,
     SGpreocupacionessomaticasV2M:Ociopracticardeporte23V2M,
     aprenderaaprender_PDV2M:aprenderaaprender_PCV2M,
     Sindrome_pre_excitacionV2M)) %>%
-  select(PSFS_V2M,NSFS_V2M,
-         gravedaddelaenfermedadV2M:PuntuaciónTotalFASTV2M, 
+  select(gravedaddelaenfermedadV2M:PuntuaciónTotalFASTV2M, 
          PuntuaciónTotalV2M_UKU, 
          everything()) 
 
@@ -253,12 +234,9 @@ PEP_6M_entrevista <- PEP %>%
   select(matches( str_remove_all(names(PEP_VB_entrevista),'_VB|BASAL_|VB'))) %>%
   mutate(PuntuaciónTotalV6M_UKU = PEP$PuntuaciónTotalV6M_UKU) %>%
   select( -c(
-    TristezaExpresadaV6M,expresividadV6M,                     
-    expresividad_tipicaV6M,
     prueba_embarazo_V6M:prueba_embarazo_resultado_V6M,
     SGpreocupacionessomaticasV6M:Sindrome_pre_excitacionV6M)) %>%
   select(
-    PSFS_V6M,NSFS_V6M,PNS_V6M,
     gravedaddelaenfermedadV6M:PuntuaciónTotalFASTV6M, PuntuaciónTotalV6M_UKU, 
     peso_V6M: V6M_Testosterona,
     Presion_sistolica_V6M,Presion_diastolica_V6M,
@@ -279,12 +257,10 @@ PEP_12M_entrevista <- PEP %>%
   select(matches( str_remove_all(names(PEP_VB_entrevista),'_VB|BASAL_|VB'))) %>%
   mutate(PuntuaciónTotalV1A_UKU  = PEP$PuntuaciónTotalV1A_UKU) %>%
   select(-c(
-    TristezaExpresadaV1A,expresividadV1A,expresividad_tipicaV1A,
     prueba_embarazo_V1AÑO:prueba_embarazo_resultado_V1AÑO,
     SGpreocupacionessomaticasV1A:Ociopracticardeporte23V1A,
     Sindrome_pre_excitacionV1A)) %>%
   select(
-    PSFS_V12M:PuntuacionTotalV1A_SAS,
     gravedaddelaenfermedadV1A:PuntuaciónTotalFASTV1A, PuntuaciónTotalV1A_UKU, 
     peso_V1AÑO: V12M_Testosterona,
     Presion_sistolica_V1AÑO,Presion_diastolica_V1AÑO,
@@ -313,18 +289,4 @@ PEP_12M_entrevista <- PEP %>%
 #     'PEP_2M_farma',
 #     'PEP_6M_farma',
 #     'PEP_12M_farma')))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

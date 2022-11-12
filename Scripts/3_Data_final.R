@@ -56,9 +56,25 @@ nombres_arreglados <- aux_renombre %>%
   pull() %>%
   .[-c(22)]
 
-names(PEP_final_unnested)[1:30];
+nombres_originales <- names(PEP_final_unnested)
+nombres_arreglados
+
+nombres_originales_2 <- nombres_originales[1:517]
+
+tibble(nombres_originales_2, nombres_arreglados) %>% view()
+tibble(nombres_originales_2, nombres_arreglados)
+nombres_originales[1:30];
 nombres_arreglados[1:30]
 
+nombres_originales_arreglados <- c(
+  nombres_arreglados[1:28],
+  rep(NA,6)
+  )
+append(nombres_arreglados,rep(NA,6),28)
+
+
+
+nombres
 
 PEP_final_unnested %>%
   select(-c(fecha_1ªhospitalizacion_sint_psic_VB))
