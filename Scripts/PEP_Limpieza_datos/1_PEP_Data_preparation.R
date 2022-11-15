@@ -4,7 +4,7 @@
 # ////////////////////////////////////////////////////////////////////////////////////////////////
 # ////////////////////////////////////////////////////////////////////////////////////////////////
 if(!require('pacman')){install.packages('pacman')}
-pacman::p_load(tidyverse,haven, broom, lubridate, readxl)
+pacman::p_load(tidyverse,haven, broom, lubridate, readxl,writexl)
 
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,10 +32,10 @@ PEP <- read_sav("Data/Definitive_PEPs.sav") %>%
 # identificadores: variables que identifican al paciente de forma general, así como sus metadatos
 # trastornos: datos de trastornos reconocidos en el paciente
 # mediciones_Basal : variables reocgidas en la primera medida del experimento
-# mediciones_2M: datos reocgidos en a los 2 meses del experimento
-# mediciones_6M: datos reocgidos en a los 2 meses del experimento
-# mediciones_1A: datos reocgidos en a los 2 meses del experimento
-# mediciones_2A: datos reocgidos en a los 2 meses del experimento
+# mediciones_2M: datos reocgidos en a los 2  meses del experimento
+# mediciones_6M: datos reocgidos en a los 6  meses del experimento
+# mediciones_1A: datos reocgidos en a los 12 meses del experimento
+# mediciones_2A: datos reocgidos en a los 24 meses del experimento
 # historia_familiar: datos recogidos en la historia familia (incluyendo padre, madre, hermanos y parientes)
 # encefalo: datos del encefalo del paciente (pruebas y estado) neuroimagen
 
@@ -152,6 +152,7 @@ PEP_identificadores <- PEP %>%
         lugar_naci_pais != 'Extranjero' & (!is.na(provincia_naci) | !is.na(provincia_resid)) ~ 'Nacional',
       TRUE ~ 'No'))) %>%
   select(-c(
+    fecha_1ªhospitalizacion_sint_psic_VB,
     fecha_nacimiento ,primera_entrevista, fecha_entrevista, fecha_primer_diagnostico,
     Iniciosíntomaspsicóticos_Fecha_estimacion_entrevistador,
     lugar_naci_pais:nivel_ocupacional_progenitor, disponibilidad:antecedentes_psicoticos_espe )) %>%
@@ -183,7 +184,7 @@ PEP_VB_entrevista <- PEP %>%
     'puntuacionTotalVB', #escala de tios de Valencia
     'peso_VB','imc_VB', 'perimetro_VB',
     # Bioquimica
-    "BASAL_Hematocrito","BASAL_Hemoglobina","BASAL_Hematies","BASAL_VCM",
+    "BASAL_Hematocrito","BASAL_Hemoglobina",'BASAL_Hemoglobina_glicosilada',"BASAL_Hematies","BASAL_VCM",
     "BASAL_HCM","BASAL_CHCM","BASAL_Plaquetas","BASAL_VPM","BASAL_IDP","BASAL_Leucocitos_totales",
     "BASAL_Eosinófilos_totales","BASAL_Basófilos_totales","BASAL_Linfocitos_totales",
     "BASAL_Monocitos_totales","BASAL_Neutrofilos_totales","BASAL_Eritrosedimentación",
@@ -242,10 +243,6 @@ PEP_6M_entrevista <- PEP %>%
     Presion_sistolica_V6M,Presion_diastolica_V6M,
     everything())
 
-
-names(PEP_extras)
-names(PEP_2M_entrevista)
-names(PEP_6M_entrevista)
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 # /////////////////////////////////////////////////////////////////////////////////////////////////
 ## Arreglo en diccionario variables Simtomatologicas de estado doce meses (12M) ----
@@ -267,26 +264,5 @@ PEP_12M_entrevista <- PEP %>%
     everything())
 
 
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-# Importación de datos de farmacologia limpios (script Aux_limpieza_farmaco) ----
-# /////////////////////////////////////////////////////////////////////////////////////////////////
-# /////////////////////////////////////////////////////////////////////////////////////////////////
 
-# source('Scripts/2_limpieza_PEP_farmaco.R')
-# 
-# rm(list=setdiff(
-#   ls(),
-#   c('PEP',
-#     'diccionario_variables',
-#     'PEP_identificadores',
-#     'PEP_VB_entrevista',
-#     'PEP_2M_entrevista',
-#     'PEP_6M_entrevista',
-#     'PEP_12M_entrevista',
-#     'PEP_toxicos',
-#     'PEP_VB_farma',
-#     'PEP_2M_farma',
-#     'PEP_6M_farma',
-#     'PEP_12M_farma')))
 
