@@ -14,10 +14,10 @@ pacman::p_load(tidyverse,haven, broom, lubridate, readxl,writexl)
 # ////////////////////////////////////////////////////////////////////////////////////////////////
 
 # Los datos son los correspondientes al PEPs del experimento
-PEP <- read_sav("Data/Definitive_PEPs.sav") %>%
+PEP <- read_sav("Data/PEP/Original_data/Definitive_PEPs.sav") %>%
   mutate_if(is.labelled,as_factor) %>%
   # añadimos la variable identificadora DTP, que está en el PEP DTP
-  inner_join(read_excel("Data/PEPs.xlsx"), by=c('ident_caso' = 'ID')) 
+  inner_join(read_excel("Data/PEP/PEPs.xlsx"), by=c('ident_caso' = 'ID')) 
 
 
 # /////////////////////////////////////////////////////////////////////////////////////////////////

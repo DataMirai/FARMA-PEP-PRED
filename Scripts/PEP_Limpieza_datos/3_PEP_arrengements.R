@@ -41,7 +41,7 @@ PEP_reconstruida_unnested <- PEP_reconstruida %>% unnest(
 
 rm(list=setdiff(ls(), c('PEP_reconstruida', 'PEP_reconstruida_unnested')))
 
-renombres <- read_xlsx('data/Nombres_PEPS_New.xlsx') %>% 
+renombres <- read_xlsx('data/PEP/Nombres_PEPS_New.xlsx') %>% 
   mutate(nombres_final = case_when(
     is.na(New_Nombres_PEP) ~ Nombres_PEP,
     TRUE ~ New_Nombres_PEP)) %>% 
@@ -51,9 +51,9 @@ PEP_reconstruida_unnested <- PEP_reconstruida_unnested %>%
   set_names(renombres) 
 
 
-extras <- read_xlsx('data/BBDD_PEPs_Extras.xlsx')
+extras <- read_xlsx('data/PEP/BBDD_PEPs_Extras.xlsx')
 
-PEP_genetica <- read_xlsx('data/PEP_PRS.xlsx')
+PEP_genetica <- read_xlsx('data/PEP/PEP_PRS.xlsx')
 
 PEP_reconstruida_unnested <- PEP_reconstruida_unnested %>%  
   left_join(.,PEP_genetica,by= c('ident_caso'= 'EXCEL')) %>%
@@ -89,7 +89,7 @@ PEP_esquizofrenia <- PEP_reconstruida_unnested %>%
     farmaco_1_12M:CEDD_Total_V12M)
 
 
-write_xlsx(PEP_esquizofrenia,path= 'Data/PEP_proyecto_esquizofrenia/PEP_esquizofrenia.xlsx')
+write_xlsx(PEP_esquizofrenia,path= 'Data/PEP/PEP_proyecto_esquizofrenia/PEP_esquizofrenia.xlsx')
 
 
 # no controles para la reticiencia.

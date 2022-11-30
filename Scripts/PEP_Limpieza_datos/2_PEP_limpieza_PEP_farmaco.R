@@ -3,10 +3,10 @@
 # Carga de bases de datos necesarias ----
 # ///////////////////////////////////////////////////////////////////////////////////
 
-anti_psicoticos <- read_xlsx(path = 'Data/CodisAP.xlsx') %>%
+anti_psicoticos <- read_xlsx(path = 'Data/PEP/CodisAP.xlsx') %>%
   mutate( AP = case_when(AP == 'ARIPIRAZOL' ~  'ARIPIPRAZOL' , TRUE ~ AP))
   
-Farmacos_mal_etiquetados <- read_xlsx(path = 'Data/farmacos_mal_etiquetados_SM.xlsx') %>%
+Farmacos_mal_etiquetados <- read_xlsx(path = 'Data/PEP/farmacos_mal_etiquetados_SM.xlsx') %>%
   rename('P_actiu'= `Ppi actiu`)
 
 PEP_farma <- PEP %>% select(any_of(diccionario_variables$farma))
