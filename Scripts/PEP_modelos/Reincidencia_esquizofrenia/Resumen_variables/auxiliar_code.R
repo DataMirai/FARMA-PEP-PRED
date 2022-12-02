@@ -1,43 +1,69 @@
 
-
-reincidencia_data
-
-respuesta <- reincidencia_data %>%
+respuesta <- 
+  ###
+  reincidencia_data %>%
   select(PNS_DEFINITIVA ) %>%
   names()
 
-explicatorias_numericas <- reincidencia_data %>%
+explicatorias_categoricas <- 
+  ###
+  reincidencia_data %>%
   select(-c(PNS_DEFINITIVA)) %>%
-  select_if(is.numeric) %>%
+  select_if(is.factor) %>%
   names() %>% 
   set_names(.)
 
-
-
-cruce_numericas <- crossing(data_frame=list(reincidencia_data),respuesta, explicatorias_numericas ) %>%
-  mutate(resumen = pmap(
-    list(
-      data_frame,
-      respuesta,
-      explicatorias_numericas),
+cruce_categoricas <-
+###
+crossing( 
+  data_frame=list(reincidencia_data),
+  respuesta, explicatorias_categoricas )  %>% 
+  mutate(tally_resumen= pmap(
+    list(data_frame,respuesta,explicatorias_categoricas) ,
     ~ ..1 %>%
-      select(any_of(c(..2,..3))) %>%
-      group_by_(.dots= ..2) %>%
-      summarise(across(everything(), .f = list(n=~n(),mean = mean, sd = sd),na.rm=T)) %>% 
-      set_names('PNS_DEFINITIVA','V_n','V_mean','V_sd') ))
+      select(any_of(c(..2,..3))) %>% 
+      group_by(.dots= c(..2,..3)) %>% 
+      tally() %>% 
+      ungroup()  ))
 
-cruce_numericas <- cruce_numericas[1:2,] 
+cruce_categoricas <- cruce_categoricas$tally_resumen %>% 
+  set_names(cruce_categoricas$explicatorias_categoricas)
 
-cruce_numericas$resumen  
+cruce_categoricas_all <- map(
+  cruce_categoricas,
+  ~ ..1 %>% 
+    group_by(.[[2]] ) %>% 
+    summarize(n= sum(n)) %>% 
+    set_names(c(names(..1)[2], 'n')) %>% 
+    mutate(PNS_DEFINITIVA= 'All') %>% 
+    bind_rows(..1) %>% 
+    select(PNS_DEFINITIVA, everything(),n ))   
 
-##########################
-# lista_ggplots_numericas <- 
+
+cruce_categoricas_all <- cruce_categoricas_all[1:2]
+Nombres_cruce_categoricas <-  Nombres_cruce_categoricas[1:2]
+
+# Nombres_cruce_categoricas <- Nombres_cruce_categoricas[1:2]
+# cruce_categoricas <- cruce_categoricas[1:2]
+
+map2(
+  cruce_categoricas_all, Nombres_cruce_categoricas,
+    ~ .x %>% 
+      ggplot(aes_string(x = .y[1], y= .y[3] ,fill = .y[2] )) +
+      geom_col( position = 'dodge') +
+      facet_wrap(as.formula(paste('~',.y[1])),scales="free_x" ) 
+      
+)
+
+
+as.factor(variable, levels = c("nombre 1", "nombre  2"))
+
 pmap(
-  cruce_numericas %>% 
+  cruce_categoricas %>% 
     as.list() ,
   ~ ..1 %>%
     ggplot(., aes_string(x = ..2, y = ..3 )) + 
-    stat_halfeye( aes_string(fill = ..2), alpha=0.5,  width= 0.65)+
+    stat_halfeye(aes_string(fill = ..2), alpha=0.5,  width= 0.75)+
     geom_boxplot(aes_string(fill = ..2), alpha=0.35, width= 0.15 ) +
     scale_x_discrete(..2,labels = c("0" = "NO","1" = "SI","NA" = "NA")) +
     scale_y_continuous(n.breaks = 10) +
@@ -56,16 +82,14 @@ pmap(
     dark_mode(theme_solarized()) +
     theme(
       panel.grid = element_line(color = "#8ccde3",size = 1.5,linetype = 2),
-      plot.title    = element_text(size= 20, face = "bold", hjust=0.10,vjust = 1),
-      plot.subtitle = element_text(size= 10, hjust= 0.10,vjust = 1 ),
-      axis.text.x   = element_text(size= 15),
-      axis.text.y   = element_text(size= 15),
-      axis.title    = element_text(size= 12),
+      plot.title    = element_text(size= 25, face = "bold", hjust=0.10,vjust = 1),
+      plot.subtitle = element_text(size= 18, hjust= 0.05),
+      axis.text.x   = element_text(size= 20),
+      axis.text.y   = element_text(size= 20),
+      axis.title    = element_text(size= 15),
       plot.caption  = element_text(hjust= 0.85),
       legend.position = "none"))  %>% 
   set_names(cruce_numericas$explicatorias_numericas)
 
 
 
-
-lista_ggplots_numericas

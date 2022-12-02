@@ -1,5 +1,5 @@
 ---
-title: "resumen variables PEP reincidencia esquizofrenia"
+title: "Resumen variables PEP reincidencia esquizofrenia"
 author: "Aitor Gonzalez"
 date: "`r Sys.Date()`"
 output: 
@@ -11,7 +11,7 @@ output:
 ```{r, setup, include=FALSE}
 knitr::opts_chunk$set(
   comment = '', 
-  fig.dim= c(12, 8),
+  fig.dim= c(12, 7),
   results = 'asis',
   echo= F,
   warning = F,
@@ -27,19 +27,22 @@ pacman::p_load(tidyverse,
 ```
 
 
-Para anializar la reincidencia, solo tendría sentido analoizar los casos en la base de datos que sean casos, no nos sirven de nada los controles en este caso. 
+Para analizar la reincidencia, solo tendría sentido analizar los casos en la base de datos que sean casos, no nos sirven de nada los controles en este caso. 
 Los filtraremos
 
 ```{r}
 reincidencia_data <- read_xlsx('Scripts/PEP_modelos/Reincidencia_esquizofrenia/Data/PEP_modelos_reincidencia.xlsx') %>%
-  mutate_if(is_character,as.factor )
+  mutate_if(is_character,as.factor ) %>%
+  filter(!is.na(PNS_DEFINITIVA))
 ```
 
 
-# resumen de las numericas
+# Resumen de las numericas
 
 ```{r}
-respuesta <- reincidencia_data %>%
+respuesta <- 
+  ###
+  reincidencia_data %>%
   select(PNS_DEFINITIVA ) %>%
   names()
 
@@ -52,7 +55,7 @@ explicatorias_numericas <-
   set_names(.)
 
 cruce_numericas <-
-  ####
+  ###
   crossing( data_frame=list(reincidencia_data),respuesta, explicatorias_numericas ) %>%
   mutate(resumen = pmap(
     list(
@@ -61,7 +64,7 @@ cruce_numericas <-
       explicatorias_numericas),
     ~ ..1 %>%
       select(any_of(c(..2,..3))) %>%
-      group_by_(.dots= ..2) %>%
+      group_by(.dots= ..2) %>%
       summarise(across(everything(), .f = list(n=~n(),mean = mean, sd = sd),na.rm=T)) %>% 
       set_names('PNS_DEFINITIVA','V_n','V_mean','V_sd') ))
 
@@ -107,7 +110,6 @@ lista_ggplots_numericas <- pmap(
 
 
 ```{r}
-
 lista_ggplots_numericas %>%
  iwalk(~ {
    cat(paste('\n## ',.y,'\n') )
@@ -115,3 +117,42 @@ lista_ggplots_numericas %>%
    cat('\n')
    })
 ```
+
+
+
+# Categoricas
+
+
+```{r}
+respuesta <- 
+  ###
+  reincidencia_data %>%
+  select(PNS_DEFINITIVA ) %>%
+  names()
+
+explicatorias_categoricas <- 
+  ###
+  reincidencia_data %>%
+  select(-c(PNS_DEFINITIVA)) %>%
+  select_if(is.factor) %>%
+  names() %>% 
+  set_names(.)
+
+# cruce_categoricas <-
+  ###
+  crossing( data_frame=list(reincidencia_data),respuesta, explicatorias_categoricas ) %>%
+  mutate(resumen = pmap(
+    list(
+      data_frame,
+      respuesta,
+      explicatorias_categoricas),
+    ~ ..1 %>%
+      select(any_of(c(..2,..3))) %>%
+      group_by(.dots= ..2) %>%
+      summarise(across(everything(), .f = list(n=~n()) ) ) )) %>% 
+    pluck(resumen)
+  
+  
+  
+```
+
