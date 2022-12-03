@@ -20,7 +20,7 @@ knitr::opts_chunk$set(
 
 ```{r}
 if(!require('pacman')){install.packages('pacman')}
-pacman::p_load(tidyverse,
+pacman::p_load(tidyverse, forcats,
                haven, broom, lubridate, 
                readxl,writexl,
                ggdist,ggthemes,ggdark)
