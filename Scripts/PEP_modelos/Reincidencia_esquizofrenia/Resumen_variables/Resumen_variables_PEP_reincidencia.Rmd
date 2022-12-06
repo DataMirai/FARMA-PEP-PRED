@@ -23,12 +23,18 @@ if(!require('pacman')){install.packages('pacman')}
 pacman::p_load(tidyverse, forcats,
                haven, broom, lubridate, 
                readxl,writexl,
-               ggdist,ggthemes,ggdark)
+               ggdist,ggthemes,ggdark,viridis,RColorBrewer,ggpmisc )
 ```
 
+# Breve contexto
 
 Para analizar la reincidencia, solo tendría sentido analizar los casos en la base de datos que sean casos, no nos sirven de nada los controles en este caso. 
 Los filtraremos
+
+
+# Matices del analisis
+
+
 
 ```{r}
 reincidencia_data <- read_xlsx('Scripts/PEP_modelos/Reincidencia_esquizofrenia/Data/PEP_modelos_reincidencia.xlsx') %>%
@@ -37,7 +43,7 @@ reincidencia_data <- read_xlsx('Scripts/PEP_modelos/Reincidencia_esquizofrenia/D
 ```
 
 
-# Resumen de las numericas
+# Resumen de las variables numericas
 
 ```{r}
 respuesta <- 
@@ -56,55 +62,174 @@ explicatorias_numericas <-
 
 cruce_numericas <-
   ###
-  crossing( data_frame=list(reincidencia_data),respuesta, explicatorias_numericas ) %>%
-  mutate(resumen = pmap(
-    list(
-      data_frame,
-      respuesta,
-      explicatorias_numericas),
-    ~ ..1 %>%
-      select(any_of(c(..2,..3))) %>%
-      group_by(.dots= ..2) %>%
-      summarise(across(everything(), .f = list(n=~n(),mean = mean, sd = sd),na.rm=T)) %>% 
-      set_names('PNS_DEFINITIVA','V_n','V_mean','V_sd') ))
+  crossing(
+    data_frame = list(reincidencia_data),
+    respuesta,
+    explicatorias_numericas) %>%
+  mutate(
+    resumen = pmap(
+      list(data_frame,respuesta,explicatorias_numericas),
+      ~ ..1 %>%
+        select(any_of(c(..2, ..3))) %>%
+        group_by(.dots = ..2) %>%
+        summarise(across(
+          everything(),
+          .f = list(n =  ~ n(), mean = mean, sd = sd),
+          na.rm = T
+        )) %>%
+        set_names('PNS_DEFINITIVA', 'V_n', 'V_mean', 'V_sd') %>%
+        mutate(
+          PNS_DEFINITIVA =  case_when(PNS_DEFINITIVA == '0' ~ 'No',
+                                      PNS_DEFINITIVA == '1' ~ 'Si')
+        ) %>%
+        mutate_if(is.numeric,  ~ round(., 2))
+    )
+  ) 
 
 ```
 
 
 ```{r}
-lista_ggplots_numericas <- pmap(
-  cruce_numericas %>% 
-    as.list() ,
-  ~ ..1 %>%
-    ggplot(., aes_string(x = ..2, y = ..3 )) + 
-    stat_halfeye(aes_string(fill = ..2), alpha=0.5,  width= 0.75)+
-    geom_boxplot(aes_string(fill = ..2), alpha=0.35, width= 0.15 ) +
-    scale_x_discrete(..2,labels = c("0" = "NO","1" = "SI","NA" = "NA")) +
-    scale_y_continuous(n.breaks = 10) +
-    stat_summary(fun=mean, colour="white", geom="point", shape=18, size=3, show.legend=F) + 
-    geom_text(
-      data= ..4,aes(
-        x= PNS_DEFINITIVA, y= ..1 %>% select(any_of(..3)) %>% max(., na.rm=T ) * 1.15 ,
-        label= paste0('n= ',V_n,'\nsd= ',round(V_sd,2),'\nmean= ', round(V_mean,2))) , 
-      vjust=1, size=3, color="white", fontface="bold") +
-    labs(
-      title = paste('Reincidencia Esquizofrenia en función de ' ,..3),
-      subtitle= 'Boxplot, densidad y resumenes por grupos',
-      x = 'Reincidencia de la esquizofrenia',
-      caption = 'Submuestra de la PEP para la estimación de la reincidencia, no hay pacientes control',
-      fill= 'Reincidencia\nEsquizofrenia') + 
-    dark_mode(theme_solarized()) +
-    theme(
-      panel.grid = element_line(color = "#8ccde3",size = 1.5,linetype = 2),
-      plot.title    = element_text(size= 25, face = "bold", hjust=0.10,vjust = 1),
-      plot.subtitle = element_text(size= 18, hjust= 0.05),
-      axis.text.x   = element_text(size= 20),
-      axis.text.y   = element_text(size= 20),
-      axis.title    = element_text(size= 15),
-      plot.caption  = element_text(hjust= 0.85),
-      legend.position = "none"))  %>% 
-  set_names(cruce_numericas$explicatorias_numericas)
+# lista_ggplots_numericas <- pmap(
+#   cruce_numericas %>% 
+#     as.list() ,
+#   ~ ..1 %>%
+#     ggplot(., aes_string(x = ..2, y = ..3 )) + 
+#     stat_halfeye(aes_string(fill = ..2), alpha=0.5,  width= 0.75)+
+#     geom_boxplot(aes_string(fill = ..2), alpha=0.35, width= 0.15 ) +
+#     scale_x_discrete(..2,labels = c("0" = "NO","1" = "SI","NA" = "NA")) +
+#     scale_y_continuous(n.breaks = 10) +
+#     stat_summary(fun=mean, colour="white", geom="point", shape=18, size=3, show.legend=F) + 
+#     geom_text(
+#       data= ..4,aes(
+#         x= PNS_DEFINITIVA, y= ..1 %>% select(any_of(..3)) %>% max(., na.rm=T ) * 1.15 ,
+#         label= paste0('n= ',V_n,'\nsd= ',round(V_sd,2),'\nmean= ', round(V_mean,2))) , 
+#       vjust=1, size=3, color="white", fontface="bold") +
+#     labs(
+#       title = paste('Reincidencia Esquizofrenia en función de ' ,..3),
+#       subtitle= 'Boxplot, densidad y resumenes por grupos',
+#       x = 'Reincidencia de la esquizofrenia',
+#       caption = 'Submuestra de la PEP para la estimación de la reincidencia, no hay pacientes control',
+#       fill= 'Reincidencia\nEsquizofrenia') + 
+#     dark_mode(theme_solarized()) +
+#     theme(
+#       panel.grid = element_line(color = "#8ccde3",size = 1.5,linetype = 2),
+#       plot.title    = element_text(size= 25, face = "bold", hjust=0.10,vjust = 1),
+#       plot.subtitle = element_text(size= 18, hjust= 0.05),
+#       axis.text.x   = element_text(size= 20),
+#       axis.text.y   = element_text(size= 20),
+#       axis.title    = element_text(size= 15),
+#       plot.caption  = element_text(hjust= 0.85),
+#       legend.position = "none"))  %>% 
+#   set_names(cruce_numericas$explicatorias_numericas)
 ```
+
+
+
+```{r}
+lista_ggplots_numericas <- pmap(
+  cruce_numericas %>%  as.list(),
+  ~ ..1 %>%
+    ggplot(aes_string(..3)) +
+    scale_x_continuous(n.breaks = 8) +
+    coord_flip() +
+    facet_grid(
+      as.formula(paste('~', ..2)),
+      scales = 'free_y',
+      labeller = as_labeller(c('No', 'Si', 'Total') %>% set_names('0', '1', '(all)'))
+    ) +
+    
+    stat_dotsinterval(
+      position = position_dodge(width = 15),
+      scale      = 0.75,
+      quantiles  = 100,
+      side       = 'left',
+      slab_color = 'black',
+      slab_fill  = 'seashell2'
+    ) +
+    
+    stat_halfeye(
+      position = "dodge",
+      point_interval = median_qi,
+      aes(fill = after_stat(cut_cdf_qi(
+        cdf, .width = c(0.66, 0.95, 1)
+      ))),
+      height = 0.75,
+      slab_alpha = 0.7,
+      interval_size_range = c(1.25, 2.5),
+      interval_colour = "darkgoldenrod2",
+      point_alpha = 1,
+      point_colour = "black",
+      shape = 18,
+      fatten_point = 1
+    ) +
+    
+    geom_table_npc(
+      data = tibble(
+        x = rep(0.5, 2),
+        y = rep(0.95, 2),
+        PNS_DEFINITIVA = c("0", "1"),
+        tb = list(
+          ..4[1, 2:4] %>% mutate_all(~ round(., 2)) %>% set_names(c('N', 'Media', 'sd')),
+          ..4[2, 2:4] %>% mutate_all(~ round(., 2)) %>% set_names(c('N', 'Media', 'sd'))
+        )
+      ),
+      aes(npcx = x, npcy = y, label = tb),
+      hjust = 1.125,
+      vjust = 1,
+      table.theme = ttheme_gtdark(base_size = 18)
+    ) +
+    
+    labs(
+      title = paste('Reincidencia Esquizofrenia en función de ' , ..3),
+      subtitle = 'Boxplot, densidad y resumenes por grupos',
+      caption = 'Submuestra de la PEP para la estimación de la reincidencia, no hay pacientes control',
+      fill = 'Reincidencia\nEsquizofrenia'
+    ) +
+    # Colores y configuración del gráfico
+    scale_fill_manual(values = c('orangered4', 'bisque2', 'slateblue4')) +
+    
+    dark_mode(theme_dark()) +
+    
+    theme(
+      panel.background = element_rect(fill = "linen"),
+      panel.grid.major = element_line(
+        color = 'black',
+        size = 0.5,
+        linetype = 2
+      ),
+      panel.grid.minor = element_line(
+        color = 'black',
+        size = 0.5,
+        linetype = 3
+      ),
+      plot.title = element_text(
+        size = 25,
+        face = "bold",
+        hjust = 0.10,
+        vjust = 1
+      ),
+      plot.subtitle = element_text(size = 18, hjust = 0.05),
+      axis.title.x  = element_blank(),
+      axis.text.x   = element_blank(),
+      axis.text.y   = element_text(size = 16),
+      axis.title.y    = element_text(size = 20),
+      plot.caption  = element_text(hjust = 0.85),
+      strip.text = element_text(color = 'white', face = 'bold', size = 23),
+      plot.margin = margin(0.5, 0.5, 0.5, 0.5, "cm"),
+      strip.background = element_rect(
+        color = "black",
+        fill = "burlywood4",
+        size = 2.5,
+        linetype = "solid"
+      ),
+      legend.position = "none",
+    )
+) 
+```
+
+
+
 
 
 
@@ -120,11 +245,12 @@ lista_ggplots_numericas %>%
 
 
 
-# Categoricas
+# Resumen de las variables categoricas
 
 
 ```{r}
-respuesta <- 
+
+respuesta_categorica <- 
   ###
   reincidencia_data %>%
   select(PNS_DEFINITIVA ) %>%
@@ -138,21 +264,82 @@ explicatorias_categoricas <-
   names() %>% 
   set_names(.)
 
-# cruce_categoricas <-
+cruce_categoricas <-
   ###
-  crossing( data_frame=list(reincidencia_data),respuesta, explicatorias_categoricas ) %>%
-  mutate(resumen = pmap(
-    list(
-      data_frame,
-      respuesta,
-      explicatorias_categoricas),
-    ~ ..1 %>%
-      select(any_of(c(..2,..3))) %>%
-      group_by(.dots= ..2) %>%
-      summarise(across(everything(), .f = list(n=~n()) ) ) )) %>% 
-    pluck(resumen)
-  
-  
-  
+  crossing( data_frame=list(reincidencia_data),respuesta_categorica, explicatorias_categoricas )
+
+
+# La idea en la creación de la lista de gráficos númericos es 
+# el hecho de utilizar cada variable explicativa como grupo base y luego hacer los facets por
+# la variable respuesta, conservandp también el margin para mantener controlado el total
+  # esto funciona ya que el facet nos daría como mucho 3 niveles, para complicaciones mayores, 
+  # habría que elaborar un heatmap  
+
+# Al tabajar con metodología map, procuraremos que cada gráfico esté correctamente hecho, 
+# para asi tener automatizado todo el proceso.
+# Para ello partiremos del objeto "cruce_categoricas" que ya está pensando para este workflow.
+
+lista_ggplots_categoricas <-
+  ####
+pmap(
+  cruce_categoricas %>%  as.list() ,
+  ~ ..1 %>% 
+    # Se debe agrupar por la variable de los facets 
+    # Para que luego el geom_text pueda establecer adecuadamete las métricas, 
+    # simplificando mucho el proceso de métricas
+    ggplot(aes_string( ..3 ) , group= ..2) +
+    geom_bar(aes_string(fill = ..3),position = 'dodge', alpha=0.8) +
+    # Texto para que aparezcan las proporciones de cada categoria en cada bloque
+    geom_text(
+      aes(label=after_stat( paste0(round(..prop..*100,1),'%') ), group=1),
+      stat = 'count',nudge_y = 7, size= 5 ) +
+    # Texto para que aparezcan el recuento de cada categoria en cada bloque
+    geom_text(
+      aes(label = paste0('n= ',after_stat(count))),
+      stat = 'count', nudge_y = 18, size = 5 ) +
+    # Facet_grid incluye un argumento margins=T, para crear un facet adicional que contiene
+      # el total de todos los grupos también, apra que se puedan observar como un nivel más.
+    # El argumento labeller permite cambiar el nombre en los facets, para no recodificar las variables
+      # necesita de un vector nombrado con los niveles originales de la variable.
+    facet_grid(
+      as.formula(paste('~',..2)),
+      scales= 'free_x', margins = T,
+      labeller = as_labeller(c('No', 'Si', 'Total') %>% set_names('0','1','(all)') ) )  +
+    # cada título esta automatizado ene ste proceso, utilizando pastes
+    labs(
+      title = paste('Reincidencia Esquizofrenia Según la escala PNS'),
+      subtitle= paste('En función de: ' ,..3,'(Gráficos de columnas)'),
+      caption = paste(..2, ' ~ ',..3 )) + 
+    # No hay un número especifico, el corte del número de ejes se hizo por trivialidad
+    scale_y_continuous(n.breaks = 10)+
+    scale_fill_viridis_d()+
+    dark_mode(theme_solarized()) +
+    # Todos los ajuestes del gráfico
+    theme(
+      plot.title    = element_text(size= 20, face = "bold", hjust=0.10,vjust = 1,color='white'),
+      plot.subtitle = element_text(size= 15, hjust= 0.08,color='white'),
+      plot.caption  = element_text(size=12,hjust= 0.95),
+      axis.title.x  = element_blank(),
+      axis.text.x   = element_blank(),
+      axis.title.y  = element_text(size= 20,color='white'),
+      axis.text.y   = element_text(size= 18),
+      axis.ticks.x  = element_blank(),
+      legend.position = "bottom",
+      legend.title = element_text(color='white',size=12),
+      legend.text = element_text(color='white',size=12),
+      strip.text = element_text(face='bold', size=12 ),
+      strip.background = element_rect( color="black", fill="slateblue4", size=2.5, linetype="solid"),
+      panel.grid    = element_line(color = "#8ccde3",size = 1.1,linetype = 2),
+      axis.line.y   = element_line(arrow = arrow(), size=0.75, color='#7A8B8B')) ) %>% 
+  set_names(cruce_categoricas$explicatorias_categoricas )
+
 ```
 
+```{r}
+lista_ggplots_categoricas %>%
+ iwalk(~ {
+   cat(paste('\n## ',.y,'\n') )
+   print(.x)
+   cat('\n')
+   })
+```
