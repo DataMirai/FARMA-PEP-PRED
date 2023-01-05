@@ -1,0 +1,131 @@
+---
+title: "Resumen variables PEP reincidencia esquizofrenia"
+author: "Aitor Gonzalez"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: yes
+    toc_float: yes
+        
+---
+
+
+aaaaaaaaaaaa
+
+a
+aa
+a
+a
+a
+a
+a
+a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(
+  comment = '', 
+  fig.dim= c(12, 7),
+  results = 'asis',
+  echo= F,
+  warning = F,
+  message = F)
+```
+
+```{r}
+if(!require('pacman')){install.packages('pacman')}
+pacman::p_load(tidyverse, forcats,
+               haven, broom, lubridate, 
+               car, gvlma , naniar, visdat,
+               readxl,writexl,
+               ggdist,ggthemes,ggdark,viridis,RColorBrewer,ggpmisc )
+```
+
+```{r}
+reincidencia_data <- read_xlsx('Scripts/PEP_modelos/Reincidencia_esquizofrenia/Data/PEP_modelos_reincidencia.xlsx') %>%
+  mutate_if(is_character,as.factor ) %>%
+  filter(!is.na(PNS_DEFINITIVA))
+```
+
+```{r}
+##############################################################
+
+respuesta <- 
+  ###
+  reincidencia_data %>%
+  select(PNS_DEFINITIVA ) %>%
+  names()
+
+explicatorias_numericas <-
+  ###
+  reincidencia_data %>%
+  select(-c(PNS_DEFINITIVA)) %>%
+  select_if(is.numeric) %>%
+  names() %>%
+  set_names(.)
+
+cruce_numericas <- 
+  ###
+  crossing( data_frame = list(reincidencia_data),respuesta,explicatorias_numericas) %>%
+  mutate(
+    resumen = pmap(
+      list(data_frame,
+           respuesta,
+           explicatorias_numericas),
+      ~ ..1 %>%
+        select(any_of(c(..2, ..3))) %>%
+        group_by(.dots = ..2) %>% summarise(across(
+          everything(),
+          .f = list(n =  ~ n(), mean = mean, sd = sd),
+          na.rm = T
+        )) %>% set_names('PNS_DEFINITIVA', 'V_n', 'V_mean', 'V_sd') %>%
+        mutate(
+          PNS_DEFINITIVA =  case_when(PNS_DEFINITIVA == '0' ~ 'No',
+                                      PNS_DEFINITIVA == '1' ~ 'Si')
+        ) %>%
+        mutate_if(is.numeric,  ~ round(., 2)))) %>%
+  mutate(data_frame = pmap(
+    list(data_frame,
+         respuesta,
+         explicatorias_numericas),
+    ~ ..1 %>%
+      select(any_of(c(..2, ..3)))))
+
+
+
+
+cruce_numericas <- cruce_numericas %>% 
+  mutate('modelo'= pmap(cruce_numericas %>% as.list(),
+         ~ glm(
+           formula = as.formula(paste(..2 , '~ ', ..3)) ,
+           data = ..1 ,
+           family = stats::binomial(link = "probit")
+     )))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

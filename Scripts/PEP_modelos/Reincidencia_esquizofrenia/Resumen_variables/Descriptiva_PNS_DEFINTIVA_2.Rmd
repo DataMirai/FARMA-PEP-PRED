@@ -1,0 +1,154 @@
+---
+title: "Reincidencia según PNS: Estadística Descriptiva "
+author: "Aitor Gonzalez"
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_depth: 3
+    toc_float: true
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  comment = '', 
+  fig.dim= c(12, 7),
+  #results = 'asis',
+  echo= T,
+  warning = F,
+  message = F
+)
+```
+
+```{css, echo=FALSE}
+pre {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+pre[class] {
+  max-height: 500px;
+}
+```
+
+```{r}
+if(!require('pacman')){install.packages('pacman')}
+pacman::p_load(
+  # para cargar todas als librereias requeridas directamente 
+  knitr,kableExtra,  # Manipulacion del markdown
+  tidyverse,         # Conjunto de librerías de progtamación de buena sintaxis y funcional
+  car, gvlma ,
+  # naniar,
+  visdat,
+  forcats, haven, broom, lubridate, # Manipulación de datos (strings, dates etc.)
+  readxl,writexl, # importación y exportaciónd e datos
+  ggdist,corrplot,ggthemes,ggdark,viridis,RColorBrewer,ggpmisc # Grafiación,(color, formato etc.
+  )
+```
+
+# Contexto
+
+## Objetivo
+
+El objetivo de este reporte es el de encontrar que carácteristicas / variables son las más relevantes  en un individuo a la hora de crear un modelo que intente predecir y explicar que conlleva a que un individuo con un episodio psicótico sea reincidencite al cabo de un año.
+
+$$ P ( \text{ Reincidencia } | X ) = f(x) $$
+
+
+## Data set
+
+El data set que utilizaremos es un arreglo del conunto de datos de la **PEP**, recopilada en el marco temporal de 2022.
+
+### Filtros de los datos
+
+Los datos contienen los siguientes filtros:
+
+> Los datos no contienen controles 
+>
+> > (Variable Ident_caso == 1)
+> La edad de los participantes en el estudio desde de ser mayores de 16 
+>
+> > (Edad_estudio >= 16) 
+> Los tipos de trastornos deben de ser no afectivos
+>
+> > (FES_SSD_NoAffective_NoToxicPsych == 1)
+
+
+```{r}
+reincidencia_data <- read_xlsx('Data/PEP/PEP_proyecto_esquizofrenia/PEP_Aitor.xlsx') %>% 
+  select( 
+    "Ident_caso","PNS_DEFINITIVA","PNS_Liemburg_Yes_No_V12M",
+    "Sexo","Etnia","Inmigrante","Nivel_socioeconomico","Nivel_urbanicidad",
+    "Antecedentes_psiquiátricos","Edad_primer_episodio",'Edad_estudio',
+    "Lewis_AB","Lewis_Total",
+    "Tabaco_VB","Alcohol_VB","cannabis_VB","Cocaina_VB",
+    "PAS_Total","DUP","DTP","PANSS_positivos_VB","PANSS_negativos_VB",
+    "PANSS_generales_VB","PANSS_total_VB","YOUNG_Total_VB",
+    "MADRS_Total_VB","FAST_Total_VB",                   
+    "PRS_SZ","PRS_BD","PRS_MDD","PRS_AD","PRS_AN","PRS_PTSD","PRS_OCD",
+    "PRS_ADHD","PRS_Neuroticism","PRS_IQ","PRS_CIQ","PRS_EA","PRS_CP",
+    "Estimation_ci","Atention","Working_memory","Verbal_memor",
+    "Executive_function","Composite_score","Cognitive_reserve", 
+    "FES_SSD_NoAffective_NoToxicPsych","TraumaticExperiences",
+    "WinterBirth" ) %>% 
+  # filtros requeridos para tener la base de datos correcta
+  filter(
+    !str_detect(.$Ident_caso, '[:alpha:]') &
+      !is.na(PNS_DEFINITIVA) &
+      Edad_estudio >=16 &
+      FES_SSD_NoAffective_NoToxicPsych ==1) %>% 
+  select(-c(Edad_estudio,FES_SSD_NoAffective_NoToxicPsych)) %>% 
+  # Convertir variables a factor
+  mutate_at(vars(c(
+    PNS_DEFINITIVA,
+    PNS_Liemburg_Yes_No_V12M,
+    WinterBirth,
+    TraumaticExperiences)),as.factor  ) %>% 
+  mutate_if(is.character,as.factor ) %>% 
+  # Arreglo de Nivel_urbanicidad
+  mutate(Nivel_urbanicidad = case_when(
+    Nivel_urbanicidad == "Ciudad de provincia con mas de 10.000 hab" ~ "Provincia",
+    Nivel_urbanicidad == "Ciudad de provincia con mas de 100.000 hab" ~ "Provincia",
+    Nivel_urbanicidad == "Desconocido" ~ NA_character_ ,
+    Nivel_urbanicidad == "Suburbio de capital" ~  "Capital",
+    TRUE ~as.character(Nivel_urbanicidad)) %>% as.factor() ) %>% 
+  mutate(Nivel_urbanicidad = factor(
+    Nivel_urbanicidad, levels= c('Capital','Provincia','Area rural'))) %>% 
+  # Arreglo Antecedentes_psiquiátricos
+  mutate(Antecedentes_psiquiátricos= case_when(
+    Antecedentes_psiquiátricos=="No valorable"~ NA_character_,
+    TRUE ~ as.character(Antecedentes_psiquiátricos)))  %>%  
+  # Arreglo de toxicos (reemplazo de No evaluado por NA)
+  mutate_at(vars(Tabaco_VB, Alcohol_VB, cannabis_VB,Cocaina_VB), as.character) %>% 
+  mutate_at(vars(Tabaco_VB, Alcohol_VB, cannabis_VB,Cocaina_VB), 
+            ~ case_when(. == "No evaluado" ~ NA_character_ , TRUE ~ .)  ) %>% 
+  mutate_at(vars(Tabaco_VB, Alcohol_VB, cannabis_VB,Cocaina_VB), as.factor ) %>% 
+  # Arreglo Nivel_socioeconomico
+  mutate(Nivel_socioeconomico = case_when(
+    Nivel_socioeconomico %in% c("Medium","Medium-High","Medium-Low") ~ "Medium",
+    Nivel_socioeconomico == "Unknown" ~ NA_character_ ,
+    TRUE ~as.character(Nivel_urbanicidad)) %>% as.factor() ) %>% 
+  mutate_if(is.character,as.factor )
+
+```
+
+
+
+
+# Quarterly Results {.tabset .tabset-fade}
+
+## By Product
+
+### Holos 
+
+(tab content)
+
+## By Region
+
+### Holos 2
+(tab content)
+
+## {.unlisted .unnumbered}
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

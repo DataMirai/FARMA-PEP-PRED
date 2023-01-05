@@ -1,0 +1,814 @@
+---
+title: "Resumen variables para modelo de reincidencia de episodios psicóticos según la escala PNS"
+author: "Aitor Gonzalez"
+output: 
+  html_document:
+    toc: yes
+    toc_float: yes
+    toc_depth: 4
+
+
+    
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(
+  comment = '', 
+  fig.dim= c(12, 7),
+  results = 'asis',
+  echo= F,
+  warning = F,
+  message = F)
+```
+
+```{r}
+if(!require('pacman')){install.packages('pacman')}
+pacman::p_load(
+  # para cargar todas als librereias requeridas directamente 
+  knitr,kableExtra,  # Manipulacion del markdown
+  tidyverse,         # Conjunto de librerías de progtamación de buena sintaxis y funcional
+  car, gvlma ,
+  # naniar,
+  visdat,
+  forcats, haven, broom, lubridate, # Manipulación de datos (strings, dates etc.)
+  readxl,writexl, # importación y exportaciónd e datos
+  ggdist,corrplot,ggthemes,ggdark,viridis,RColorBrewer,ggpmisc # Grafiación,(color, formato etc.
+  )
+```
+
+# Contexto
+
+## Objetivo
+
+El objetivo de este reporte es el de encontrar que carácteristicas / variables son las más relevantes  en un individuo a la hora de crear un modelo que intente predecir y explicar que conlleva a que un individuo con un episodio psicótico sea reincidencite al cabo de un año.
+
+$$ P ( \text{ Reincidencia } | X ) = f(x) $$
+
+## Filtros de los datos
+
+Los datos contienen los siguientes filtros:
+
+* Los datos no contienen controles (variable Ident_caso)
+* Edad > o =16 
+* FES_SSD_NoAffective_NoToxicPsych = 1
+
+
+
+```{r}
+# En este script se cargan los datos, la selección de variables YA SE HA HECHO, solo 
+
+reincidencia_data <- read_xlsx('Data/PEP/PEP_proyecto_esquizofrenia/PEP_Aitor.xlsx') %>% 
+  select( 
+    "Ident_caso","PNS_DEFINITIVA","PNS_Liemburg_Yes_No_V12M",
+    "Sexo","Etnia","Inmigrante","Nivel_socioeconomico","Nivel_urbanicidad",
+    "Antecedentes_psiquiátricos","Edad_primer_episodio",'Edad_estudio',
+    "Lewis_AB","Lewis_Total",
+    "Tabaco_VB","Alcohol_VB","cannabis_VB","Cocaina_VB",
+    "PAS_Total","DUP","DTP","PANSS_positivos_VB","PANSS_negativos_VB",
+    "PANSS_generales_VB","PANSS_total_VB","YOUNG_Total_VB",
+    "MADRS_Total_VB","FAST_Total_VB",                   
+    "PRS_SZ","PRS_BD","PRS_MDD","PRS_AD","PRS_AN","PRS_PTSD","PRS_OCD",
+    "PRS_ADHD","PRS_Neuroticism","PRS_IQ","PRS_CIQ","PRS_EA","PRS_CP",
+    "Estimation_ci","Atention","Working_memory","Verbal_memor",
+    "Executive_function","Composite_score","Cognitive_reserve", 
+    "FES_SSD_NoAffective_NoToxicPsych","TraumaticExperiences",
+    "Weight_At_birth", "WinterBirth" ) %>% 
+  filter(
+    !str_detect(.$Ident_caso, '[:alpha:]') &
+      !is.na(PNS_DEFINITIVA) & (
+      Edad_estudio >16 &
+      FES_SSD_NoAffective_NoToxicPsych ==1)) %>% 
+  # select(-c(Edad_estudio,FES_SSD_NoAffective_NoToxicPsych)) %>% 
+  mutate_at(vars(c(
+    PNS_DEFINITIVA,
+    PNS_Liemburg_Yes_No_V12M,
+    WinterBirth,
+    TraumaticExperiences)),as.factor  ) %>% 
+  mutate_if(is.character,as.factor )
+
+```
+
+
+## Data set
+
+El data set que utilizaremos es un arreglo del data set de la PEP recopilada con las siguientes variables:
+
+* Como respuesta:
+
+
+```{r}
+reincidencia_data %>%
+  select(PNS_DEFINITIVA,PNS_Liemburg_Yes_No_V12M) %>% 
+  names() %>% 
+  walk(~ {
+   cat(paste('\n  + ',.,'\n') )
+   })
+
+```
+
+
+* Como variables explicativas:
+
+```{r}
+reincidencia_data %>%
+  select(-c(PNS_DEFINITIVA,Ident_caso,PNS_Liemburg_Yes_No_V12M)) %>% 
+  names() %>% 
+  walk(~ {
+   cat(paste('\n  + ',..1,'\n') )
+   })
+```
+
+
+
+
+# PNS_DEFINITIVA 
+
+## Variables numericas
+
+### Graficos
+
+```{r}
+
+# Creacion del tibble de las variables explicativas numericas con la respuesta ----
+
+respuesta_numerica <- 
+  ###
+  reincidencia_data %>%
+  select(PNS_DEFINITIVA ) %>%   # Marcar que variables queremos como respuesta
+  names()
+
+explicatorias_numericas <- 
+  ###
+  reincidencia_data %>%
+  # Marcar que variables tenemos como respuesta para no utilizarlas 
+  select(-c(
+    Ident_caso,
+    PNS_DEFINITIVA,
+    PNS_Liemburg_Yes_No_V12M)) %>%
+  # en este caso vamos a hacer el resumen de las variables numericas 
+  select_if(is.numeric) %>%
+  names() %>% 
+  set_names(.)
+
+cruce_numericas <-
+  ###
+  crossing(
+    data_frame = list(reincidencia_data),
+    respuesta_numerica,
+    explicatorias_numericas) %>%
+  mutate(
+    resumen = pmap(
+      list(data_frame,respuesta_numerica,explicatorias_numericas),
+      ~ ..1 %>%
+        select(any_of(c(..2, ..3))) %>%
+        group_by(.dots = ..2) %>%
+        summarise(across(
+          everything(),
+          .f = list(n =  ~ n(), mean = mean, sd = sd),
+          na.rm = T
+        )) %>%
+        set_names('PNS_DEFINITIVA', 'V_n', 'V_mean', 'V_sd') %>%
+        mutate(
+          PNS_DEFINITIVA =  case_when(PNS_DEFINITIVA == '0' ~ 'No',
+                                      PNS_DEFINITIVA == '1' ~ 'Si')) %>%
+        mutate_if(is.numeric,  ~ round(., 2)))) %>% 
+  mutate('data_frame'= pmap(.,
+    ~ ..1 %>%  select(any_of(c(..2, ..3))) ))
+
+
+```
+
+```{r}
+
+explicatorias_numericas %>%
+  names() %>% 
+  walk(~ {
+   cat(paste('\n  + ',..1,'\n') )
+   })
+
+```
+
+```{r}
+
+reincidencia_data %>%
+  select_if(is.numeric ) %>%
+  cor(method="pearson", use = "complete.obs") %>%
+  round(digits=2) %>%
+  corrplot()
+
+vis_miss( reincidencia_data , cluster = F , sort_miss = T ) +
+  labs(title='Porcentajes de NA por columnas')+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0))
+
+vis_miss(reincidencia_data, cluster = T , sort_miss = T , show_perc = T , show_perc_col = T) +
+  labs(title='Porcentajes de NA por pacientes')+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0))
+
+
+
+vis_cor(
+  reincidencia_data %>%  select_if(is.numeric ),
+  cor_method = "pearson",
+  na_action = "pairwise.complete.obs")
+
+```
+
+
+
+
+
+```{r}
+# Creacion de la lista de plots resumen de las variables numericas ----
+
+lista_ggplots_numericas <-
+  ###
+  pmap(
+    cruce_numericas %>%  as.list(),
+    ~ ..1 %>%
+      ggplot(aes_string(..3)) +
+      scale_x_continuous(n.breaks = 8) +
+      coord_flip() +
+      facet_grid(
+        as.formula(paste('~', ..2)),
+        scales = 'free_y',
+        labeller = as_labeller(c('No', 'Si', 'Total') %>% set_names('0', '1', '(all)'))
+      ) +
+      
+      stat_dotsinterval(
+        position = position_dodge(width = 15),
+        scale      = 0.75,
+        quantiles  = 100,
+        side       = 'left',
+        slab_color = 'black',
+        slab_fill  = 'seashell2',
+        interval_size = 3,
+        interval_size_range = c(3, 5.5),
+        interval_colour = "darkgoldenrod2",
+        point_alpha = 1,
+        point_colour = "black",
+        shape = 18,
+        fatten_point = 1
+      ) +
+      
+      stat_halfeye(
+        position = "dodge",
+        point_interval = median_qi,
+        aes(fill = after_stat(cut_cdf_qi(
+          cdf, .width = c(0.66, 0.95, 1)
+        ))),
+        height = 0.75,
+        slab_alpha = 0.7,
+        interval_size = 3,
+        interval_size_range = c(3, 5.5),
+        interval_colour = "darkgoldenrod2",
+        point_alpha = 1,
+        point_colour = "black",
+        shape = 18,
+        fatten_point = 1
+      ) +
+      
+      geom_table_npc(
+        data = tibble(
+          x = rep(0.5, 2),
+          y = rep(0.95, 2),
+          PNS_DEFINITIVA = c("0", "1"),
+          tb = list(
+            ..4[1, 2:4] %>% mutate_all( ~ round(., 2)) %>% set_names(c('N', 'Media', 'sd')),
+            ..4[2, 2:4] %>% mutate_all( ~ round(., 2)) %>% set_names(c('N', 'Media', 'sd'))
+          )
+        ),
+        aes(npcx = x, npcy = y, label = tb),
+        hjust = 1.125,
+        vjust = 1,
+        table.theme = ttheme_gtdark(base_size = 18)
+      ) +
+      
+      labs(
+        title = paste('Reincidencia Esquizofrenia (Según la escala PNS)'),
+        subtitle = paste('En función de: ' , ..3, '(Densidad, puntos, boxplot)'),
+        caption = paste(..2, ' ~ ', ..3),
+        fill = 'Reincidencia\nEsquizofrenia'
+      ) +
+      # Colores y configuración del gráfico
+      scale_fill_manual(values = c('orangered4', 'bisque2', 'slateblue4')) +
+      
+      dark_mode(theme_dark()) +
+      
+      theme(
+        panel.background = element_rect(fill = "linen"),
+        panel.grid.major = element_line(
+          color = 'black',
+          size = 0.5,
+          linetype = 2
+        ),
+        panel.grid.minor = element_line(
+          color = 'black',
+          size = 0.5,
+          linetype = 3
+        ),
+        plot.title = element_text(
+          size = 25,
+          face = "bold",
+          hjust = 0.10,
+          vjust = 1
+        ),
+        plot.subtitle = element_text(size = 18, hjust = 0.05),
+        axis.title.x  = element_blank(),
+        axis.text.x   = element_blank(),
+        axis.text.y   = element_text(size = 16),
+        axis.title.y    = element_text(size = 20),
+        plot.caption  = element_text(hjust = 0.85),
+        strip.text = element_text(color = 'white', face = 'bold', size = 23),
+        plot.margin = margin(0.5, 0.5, 0.5, 0.5, "cm"),
+        strip.background = element_rect(
+          color = "black",
+          fill = "burlywood4",
+          size = 2.5,
+          linetype = "solid"
+        ),
+        legend.position = "none",
+      )
+  ) %>%
+  set_names(cruce_numericas$explicatorias_numericas)
+
+```
+
+
+
+
+
+
+
+```{r}
+lista_ggplots_numericas %>%
+ iwalk(~ {
+   cat(paste('\n#### ',.y,'\n') )
+   print(.x)
+   cat('\n')
+   })
+```
+
+### Seleccion de variables **numéricas**
+
+#### Caso respuesta vs variable sola
+
+Estimamos este proceso con una regresión logísitica solo ajustada a la variable contra la respuesta.  
+
+```{r}
+
+cruce_numericas_bivariante <- cruce_numericas %>% 
+  mutate('modelo'= pmap(cruce_numericas %>% as.list(),
+         ~ glm(
+           formula = as.formula(paste(..2 , '~ ', ..3)) ,
+           data = ..1 ,
+           family = stats::binomial(link = "probit")
+     )))
+
+tabla_variables_numericas_bivariante <-
+  ###
+  cruce_numericas_bivariante$modelo %>% 
+    map(tidy) %>% 
+    # keep(., ~ all(.x$p.value <= 0.05  ) ) %>% 
+    bind_rows() %>% 
+    mutate_at(vars(-term), ~round(.,3)) %>% 
+    filter(term != '(Intercept)' ) %>% 
+    arrange(p.value) %>% 
+  mutate(
+    Risk_protection = case_when(
+      estimate <=0 ~ 'Proteccion',
+      estimate > 0 ~ 'Riesgo')) %>% 
+  rename_all(str_to_title) %>% 
+  rename('P_value'='P.value' )
+    
+```
+
+
+```{r}
+
+tabla_variables_numericas_bivariante %>% 
+    mutate_at(
+      vars(P_value),
+      ~ cell_spec(
+        P_value, 
+        color = 'black',
+         background = case_when(
+          between(P_value,0.000,0.059) ~ 'red',
+          between(P_value,0.060,0.199) ~ 'orange',
+          between(P_value,0.200,0.499) ~ 'yellow',
+          between(P_value,0.500,1.000) ~ 'White') 
+    )) %>%
+  mutate_at(
+    vars(Risk_protection),
+    ~ cell_spec(
+      Risk_protection,
+      color = 'black',
+      background = case_when(
+        Risk_protection == 'Proteccion' ~ 'green',
+        Risk_protection == 'Riesgo'     ~ 'red')
+  )) %>%
+  kable(escape = F)
+
+```
+
+
+#### Caso respuesta vs interacciones de orden 2
+
+Estimamos este proceso con una regresión logísitica ajustando por todas las combinaciones de variables 2 a 2 contra la variable contra la respuesta.  
+
+
+```{r}
+
+Cruce_numericas_interaccion_orden_2 <- tibble(
+  combinacion = combn(
+    cruce_numericas$explicatorias_numericas, 
+    2, paste0, collapse = " ")) %>% 
+  separate(combinacion, c("Numerica_1", "Numerica_2"), " ") %>% 
+  mutate('data_frame' = list(reincidencia_data),
+         'respuesta'  = respuesta_numerica) %>% 
+  select(data_frame, respuesta, Numerica_1,Numerica_2) %>% 
+  mutate('data_frame'= pmap(., ~ ..1 %>%  select(any_of(c(..2, ..3, ..4)))))
+
+
+Cruce_numericas_interaccion_orden_2 <-
+  Cruce_numericas_interaccion_orden_2 %>%
+  mutate('modelo' = pmap(
+    Cruce_numericas_interaccion_orden_2 %>% as.list(),
+    ~ glm(
+      formula = as.formula(paste0(..2   , '~(', ..3   , '+' , ..4   , ')^2')),
+      data = ..1 ,
+      family = stats::binomial(link = "logit")
+    )
+  ))
+
+
+
+
+tabla_variables_numericas_interaccion_orden_2 <-
+  ###
+  Cruce_numericas_interaccion_orden_2$modelo %>%
+  map(tidy) %>%
+  bind_rows() %>%
+  filter(term != '(Intercept)' & !is.na(p.value)) %>%
+  group_by(term) %>%
+  summarize(
+    'Estimate'  = round(mean(estimate , na.rm = T),3),
+    'Std_error' = round(mean(std.error, na.rm = T),3),
+    'Statistic' = round(mean(statistic, na.rm = T),3),
+    'P_value'   = round(mean(p.value  , na.rm = T),3 )) %>%
+  ungroup() %>% 
+  rename('Term' = 'term' ) %>% 
+  arrange(P_value) %>%
+  mutate(
+    Risk_protection = case_when(
+      Estimate <= 0 ~ 'Proteccion',
+      Estimate > 0 ~ 'Riesgo'))
+  
+    
+```
+
+
+
+```{r}
+tabla_variables_numericas_interaccion_orden_2 %>% 
+  mutate_at(
+      vars(P_value),
+      ~ cell_spec(
+        P_value, 
+        color = 'black',
+        background = case_when(
+          between(P_value,0.000,0.059) ~ 'red',
+          between(P_value,0.060,0.199) ~ 'orange',
+          between(P_value,0.200,0.299) ~ 'yellow',
+          between(P_value,0.300,0.699) ~ 'White' ,
+          between(P_value,0.700,1.00)  ~ 'green') 
+  )) %>% 
+  mutate_at(
+    vars(Risk_protection),
+    ~ cell_spec(
+      Risk_protection, 
+      color = 'black',
+      background = case_when(
+        Risk_protection == 'Proteccion' ~ 'green',
+        Risk_protection == 'Riesgo'     ~ 'red')
+  )) %>%
+  mutate_if(is.numeric, funs(as.character(signif(., 3)))) %>% 
+  kable(escape = F)
+```
+
+
+
+
+
+## Variables categoricas
+
+```{r}
+respuesta_categorica <- 
+  ###
+  reincidencia_data %>%
+  select(PNS_DEFINITIVA ) %>%
+  names()
+
+explicatorias_categoricas <- 
+  ###
+  reincidencia_data %>%
+  select(-c(PNS_DEFINITIVA,Ident_caso,PNS_Liemburg_Yes_No_V12M)) %>%
+  select_if(is.factor) %>%
+  names() %>% 
+  set_names(.)
+
+
+cruce_categoricas <-
+  ###
+  crossing(
+    data_frames = list(reincidencia_data),
+    respuesta_categorica,
+    explicatorias_categoricas) %>%
+  mutate(data_frames = pmap(., ~ ..1 %>%  select(any_of(c(..2, ..3))) ))
+```
+
+
+```{r}
+explicatorias_categoricas %>%
+  names() %>% 
+  walk(~ {
+   cat(paste('\n  + ',..1,'\n') )
+   })
+```
+
+### Graficos
+
+```{r}
+# La idea en la creación de la lista de gráficos númericos es 
+# el hecho de utilizar cada variable explicativa como grupo base y luego hacer los facets por
+# la variable respuesta, conservandp también el margin para mantener controlado el total
+  # esto funciona ya que el facet nos daría como mucho 3 niveles, para complicaciones mayores, 
+  # habría que elaborar un heatmap  
+
+# Al tabajar con metodología map, procuraremos que cada gráfico esté correctamente hecho, 
+# para asi tener automatizado todo el proceso.
+# Para ello partiremos del objeto "cruce_categoricas" que ya está pensando para este workflow.
+
+lista_ggplots_categoricas <-
+  ####
+pmap(
+  cruce_categoricas %>%  as.list() ,
+  ~ ..1 %>% 
+    # Se debe agrupar por la variable de los facets 
+    # Para que luego el geom_text pueda establecer adecuadamete las métricas, 
+    # simplificando mucho el proceso de métricas
+    ggplot(aes_string( ..3 ) , group= ..2) +
+    geom_bar(aes_string(fill = ..3),position = 'dodge', alpha=0.8) +
+    # Texto para que aparezcan las proporciones de cada categoria en cada bloque
+    geom_text(
+      aes(label=after_stat( paste0(round(..prop..*100,1),'%') ), group=1),
+      stat = 'count',nudge_y = 7, size= 5 ) +
+    # Texto para que aparezcan el recuento de cada categoria en cada bloque
+    geom_text(
+      aes(label = paste0('n= ',after_stat(count))),
+      stat = 'count', nudge_y = 18, size = 5 ) +
+    # Facet_grid incluye un argumento margins=T, para crear un facet adicional que contiene
+      # el total de todos los grupos también, apra que se puedan observar como un nivel más.
+    # El argumento labeller permite cambiar el nombre en los facets, para no recodificar las variables
+      # necesita de un vector nombrado con los niveles originales de la variable.
+    facet_grid(
+      as.formula(paste('~',..2)),
+      scales= 'free_x', margins = T,
+      labeller = as_labeller(c('No', 'Si', 'Total') %>% set_names('0','1','(all)') ) )  +
+    # cada título esta automatizado ene ste proceso, utilizando pastes
+    labs(
+      title = paste('Reincidencia Esquizofrenia (Según la escala PNS)'),
+      subtitle= paste('En función de: ' ,..3,'(Gráficos de columnas)'),
+      caption = paste(..2, ' ~ ',..3 )) + 
+    # No hay un número especifico, el corte del número de ejes se hizo por trivialidad
+    scale_y_continuous(n.breaks = 10)+
+    scale_fill_viridis_d()+
+    dark_mode(theme_solarized()) +
+    # Todos los ajuestes del gráfico
+    theme(
+      plot.title    = element_text(size= 20, face = "bold", hjust=0.10,vjust = 1,color='white'),
+      plot.subtitle = element_text(size= 15, hjust= 0.08,color='white'),
+      plot.caption  = element_text(size=12,hjust= 0.95),
+      axis.title.x  = element_blank(),
+      axis.text.x   = element_blank(),
+      axis.title.y  = element_text(size= 20,color='white'),
+      axis.text.y   = element_text(size= 18),
+      axis.ticks.x  = element_blank(),
+      legend.position = "bottom",
+      legend.title = element_text(color='white',size=12),
+      legend.text = element_text(color='white',size=12),
+      strip.text = element_text(face='bold', size=12 ),
+      strip.background = element_rect( color="black", fill="slateblue4", size=2.5, linetype="solid"),
+      panel.grid    = element_line(color = "#8ccde3",size = 1.1,linetype = 2),
+      axis.line.y   = element_line(arrow = arrow(), size=0.75, color='#7A8B8B')) ) %>% 
+  set_names(cruce_categoricas$explicatorias_categoricas )
+
+```
+
+```{r}
+lista_ggplots_categoricas %>%
+ iwalk(~ {
+   cat(paste('\n#### ',.y,'\n'    ) )
+   print(.x)
+   cat('\n')
+   })
+```
+
+
+### Seleccion de variables **categóricas**
+
+#### Caso respuesta vs variable sola
+
+Estimamos este proceso con una regresión logísitica solo ajustada a la variable contra la respuesta.  
+
+```{r}
+
+cruce_categoricas_bivariante <- cruce_categoricas %>% 
+  mutate('modelo'= pmap(cruce_categoricas %>% as.list(),
+         ~ glm(
+           formula = as.formula(paste(..2 , '~ ', ..3)) ,
+           data = ..1 ,
+           family = stats::binomial(link = "logit")
+     )))
+
+tabla_variables_categoricas_bivariante <-
+  ###
+  cruce_categoricas_bivariante$modelo %>% 
+    map(tidy) %>% 
+    # keep(., ~ all(.x$p.value <= 0.05  ) ) %>% 
+    bind_rows() %>% 
+    mutate_at(vars(-term), ~round(.,3)) %>% 
+    filter(term != '(Intercept)' ) %>% 
+    arrange(p.value) %>% 
+  mutate(
+    Risk_protection = case_when(
+      estimate <=0 ~ 'Proteccion',
+      estimate > 0 ~ 'Riesgo')) %>% 
+  rename_all(str_to_title) %>% 
+  rename('P_value'='P.value' )
+    
+```
+
+
+```{r}
+
+tabla_variables_categoricas_bivariante %>% 
+    mutate_at(
+      vars(P_value),
+      ~ cell_spec(
+        P_value, 
+        color = 'black',
+         background = case_when(
+          between(P_value,0.000,0.059) ~ 'red',
+          between(P_value,0.060,0.199) ~ 'orange',
+          between(P_value,0.200,0.499) ~ 'yellow',
+          between(P_value,0.500,1.000) ~ 'White') 
+    )) %>%
+  mutate_at(
+    vars(Risk_protection),
+    ~ cell_spec(
+      Risk_protection,
+      color = 'black',
+      background = case_when(
+        Risk_protection == 'Proteccion' ~ 'green',
+        Risk_protection == 'Riesgo'     ~ 'red')
+  )) %>%
+  kable(escape = F)
+
+```
+
+
+#### Caso respuesta vs interacciones de orden 2
+
+Estimamos este proceso con una regresión logísitica ajustando por todas las combinaciones de variables 2 a 2 contra la variable contra la respuesta.  
+
+
+```{r}
+
+Cruce_categoricas_interaccion_orden_2 <- tibble(
+  combinacion = combn(
+    cruce_categoricas$explicatorias_categoricas, 
+    2, paste0, collapse = " ")) %>% 
+  separate(combinacion, c("Factor_1", "Factor_2"), " ") %>% 
+  mutate('data_frame' = list(reincidencia_data),
+         'respuesta'  = respuesta_categorica) %>% 
+  select(data_frame, respuesta, Factor_1,Factor_2) %>% 
+  mutate('data_frame'= pmap(., ~ ..1 %>%  select(any_of(c(..2, ..3, ..4)))))
+
+
+Cruce_categoricas_interaccion_orden_2 <-
+  Cruce_categoricas_interaccion_orden_2 %>%
+  mutate('modelo' = pmap(
+    Cruce_categoricas_interaccion_orden_2 %>% as.list(),
+    ~ glm(
+      formula = as.formula(paste0(..2   , '~(', ..3   , '+' , ..4   , ')^2')),
+      data = ..1 ,
+      family = stats::binomial(link = "probit")
+    )
+  ))
+
+
+
+
+tabla_variables_categoricas_interaccion_orden_2 <-
+  ###
+  Cruce_categoricas_interaccion_orden_2$modelo %>%
+  map(tidy) %>%
+  bind_rows() %>%
+  filter(term != '(Intercept)' & !is.na(p.value)) %>%
+  group_by(term) %>%
+  summarize(
+    'Estimate'  = round(mean(estimate , na.rm = T),3),
+    'Std_error' = round(mean(std.error, na.rm = T),3),
+    'Statistic' = round(mean(statistic, na.rm = T),3),
+    'P_value'   = round(mean(p.value  , na.rm = T),3 )) %>%
+  ungroup() %>% 
+  rename('Term' = 'term' ) %>% 
+  arrange(P_value) %>%
+  mutate(
+    Risk_protection = case_when(
+      Estimate <= 0 ~ 'Proteccion',
+      Estimate > 0 ~ 'Riesgo'))
+  
+    
+```
+
+```{r}
+tabla_variables_categoricas_interaccion_orden_2 %>% 
+  mutate_at(
+      vars(P_value),
+      ~ cell_spec(
+        P_value, 
+        color = 'black',
+        background = case_when(
+          between(P_value,0.000,0.059) ~ 'red',
+          between(P_value,0.060,0.199) ~ 'orange',
+          between(P_value,0.200,0.299) ~ 'yellow',
+          between(P_value,0.300,0.699) ~ 'White' ,
+          between(P_value,0.700,1.00)  ~ 'green') 
+  )) %>% 
+  mutate_at(
+    vars(Risk_protection),
+    ~ cell_spec(
+      Risk_protection, 
+      color = 'black',
+      background = case_when(
+        Risk_protection == 'Proteccion' ~ 'green',
+        Risk_protection == 'Riesgo'     ~ 'red')
+  )) %>%
+  mutate_if(is.numeric, funs(as.character(signif(., 3)))) %>% 
+  kable(escape = F)
+```
+
+
+Aún pendiente
+
+# PNS_Liemburg_Yes_No_V12M
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

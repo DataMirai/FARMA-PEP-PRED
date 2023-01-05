@@ -18,8 +18,6 @@ ggplot(aes(y)) +
     strip.text = element_blank())
 
 
-
-
 ########################################################################
 ########################################################################
 
@@ -30,50 +28,55 @@ ggplot(aes(y)) +
 ########################################################################
 
 
+reincidencia_data %>% 
+  select_if(is.numeric ) %>% 
+  cor(method="pearson", use = "complete.obs") %>% 
+  round(digits=2) %>% 
+  corrplot()
+
+vis_miss( reincidencia_data , cluster = F , sort_miss = T ) +
+  labs(title='Porcentajes de NA por columnas')+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0))
+
+vis_miss(reincidencia_data, cluster = T , sort_miss = T , show_perc = T , show_perc_col = T) +
+  labs(title='Porcentajes de NA por pacientes')+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0))
 
 
-respuesta <- 
-  ###
-  reincidencia_data %>%
-  select(PNS_DEFINITIVA ) %>%
-  names()
 
-explicatorias_numericas <- 
-  ###
-  reincidencia_data %>%
-  select(-c(PNS_DEFINITIVA)) %>%
-  select_if(is.numeric) %>%
-  names() %>% 
-  set_names(.)
-
-cruce_numericas <-
-  ###
-  crossing( data_frame=list(reincidencia_data),respuesta, explicatorias_numericas ) %>%
-  mutate(resumen = pmap(
-    list(
-      data_frame,
-      respuesta,
-      explicatorias_numericas),
-    ~ ..1 %>%
-      select(any_of(c(..2,..3))) %>%
-      group_by(.dots= ..2) %>%
-      summarise(across(everything(), .f = list(n=~n(),mean = mean, sd = sd),na.rm=T)) %>% 
-      set_names('PNS_DEFINITIVA','V_n','V_mean','V_sd') %>% 
-      mutate(PNS_DEFINITIVA=  case_when(
-        PNS_DEFINITIVA=='0'~'No',
-        PNS_DEFINITIVA=='1'~'Si')) %>% 
-      mutate_if(is.numeric,~round(.,2) )
-    )) 
-      
+vis_cor(
+  reincidencia_data %>%  select_if(is.numeric ), 
+  cor_method = "pearson",
+  na_action = "pairwise.complete.obs")
 
 
-experimento <- cruce_numericas[1:2,]
 
-experimento
+reincidencia_data %>% 
+  select_if(is.numeric ) %>% 
+  cor(method="pearson", use = "complete.obs") %>% 
+  round(digits=2) %>% 
+  corrplot()
+
+vis_miss( reincidencia_data , cluster = F , sort_miss = T ) +
+  labs(title='Porcentajes de NA por columnas')+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0))
+
+vis_miss(reincidencia_data, cluster = T , sort_miss = T , show_perc = T , show_perc_col = T) +
+  labs(title='Porcentajes de NA por pacientes')+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0))
 
 
+
+vis_cor(
+  reincidencia_data %>%  select_if(is.numeric ), 
+  cor_method = "pearson",
+  na_action = "pairwise.complete.obs")
+
+
+
+###
 pmap(
-  experimento %>%  as.list(),
+  cruce_numericas %>%  as.list(),
   ~ ..1 %>%
     ggplot(aes_string(..3)) +
     scale_x_continuous(n.breaks = 8) +
@@ -90,33 +93,39 @@ pmap(
       quantiles  = 100,
       side       = 'left',
       slab_color = 'black',
-      slab_fill  = 'seashell2'
-    ) +
-    
-    stat_halfeye(
-      position = "dodge",
-      point_interval = median_qi,
-      aes(fill = after_stat(cut_cdf_qi(
-        cdf, .width = c(0.66, 0.95, 1)
-      ))),
-      height = 0.75,
-      slab_alpha = 0.7,
-      interval_size_range = c(1.25, 2.5),
+      slab_fill  = 'seashell2',
+      interval_size = 3,
+      interval_size_range = c(3, 5.5),
       interval_colour = "darkgoldenrod2",
       point_alpha = 1,
       point_colour = "black",
       shape = 18,
       fatten_point = 1
     ) +
-    
+
+    stat_halfeye(
+      position = "dodge",
+      point_interval = median_qi,
+      aes(fill = after_stat(cut_cdf_qi(cdf, .width = c(0.66, 0.95, 1)))),
+      height = 0.75,
+      slab_alpha = 0.7,
+      interval_size = 3,
+      interval_size_range = c(3, 5.5),
+      interval_colour = "darkgoldenrod2",
+      point_alpha = 1,
+      point_colour = "black",
+      shape = 18,
+      fatten_point = 1
+    ) +
+
     geom_table_npc(
       data = tibble(
         x = rep(0.5, 2),
         y = rep(0.95, 2),
         PNS_DEFINITIVA = c("0", "1"),
         tb = list(
-          ..4[1, 2:4] %>% mutate_all(~ round(., 2)) %>% set_names(c('N', 'Media', 'sd')),
-          ..4[2, 2:4] %>% mutate_all(~ round(., 2)) %>% set_names(c('N', 'Media', 'sd'))
+          ..4[1, 2:4] %>% mutate_all( ~ round(., 2)) %>% set_names(c('N', 'Media', 'sd')),
+          ..4[2, 2:4] %>% mutate_all( ~ round(., 2)) %>% set_names(c('N', 'Media', 'sd'))
         )
       ),
       aes(npcx = x, npcy = y, label = tb),
@@ -126,18 +135,18 @@ pmap(
     ) +
     
     labs(
-      title = paste('Reincidencia Esquizofrenia en función de ' , ..3),
-      subtitle = 'Boxplot, densidad y resumenes por grupos',
-      caption = 'Submuestra de la PEP para la estimación de la reincidencia, no hay pacientes control',
+      title = paste('Reincidencia Esquizofrenia (Según la escala PNS)'),
+      subtitle = paste('En función de: ' , ..3, '(Densidad, puntos, boxplot)'),
+      caption = paste(..2, ' ~ ', ..3),
       fill = 'Reincidencia\nEsquizofrenia'
     ) +
-    # Colores y configuración del gráfico
-    scale_fill_manual(values = c('orangered4', 'bisque2', 'slateblue4')) +
+    #Colores y configuración del gráfico
+    scale_fill_manual(values = c('orangered', 'bisque2', 'slateblue4')) +
     
     dark_mode(theme_dark()) +
     
     theme(
-      panel.background = element_rect(fill = "linen"),
+      panel.background = element_rect(fill = 'linen' ),
       panel.grid.major = element_line(
         color = 'black',
         size = 0.5,
@@ -170,10 +179,5 @@ pmap(
       ),
       legend.position = "none",
     )
-) 
-
-
-
-
-
-
+) %>%
+  set_names(cruce_numericas$explicatorias_numericas)
