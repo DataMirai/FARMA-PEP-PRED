@@ -1,9 +1,17 @@
+if(!require('pacman')){install.packages('pacman')}
+pacman::p_load(
+  # para cargar todas als librereias requeridas directamente 
+  tidyverse, tidymodels, # Conjunto de librerías de progtamación de buena sintaxis y funcional
+  parsnip, ranger, #Modelizacion con tidymodels, mice,
+  naniar,mice,randomForest,glmnet,doParallel,DALEXtra,broom,
+  readxl,writexl, parallel # importación y exportaciónd e datos)
+)
 
-particion_inicial_reincidencia <- initial_split(data = reincidencia_data_PNS, prop = 0.75)
-train_c <- training(particion_inicial_reincidencia)
+
+particion_inicial_reincidencia <- initial_split(data = reincidencia_data_PNS, prop = 0.75)train_c <- training(particion_inicial_reincidencia)
 test_c <- testing(particion_inicial_reincidencia)
 
-
+detectCores()
 submuestras_kfold_c <- vfold_cv(data = train_c, v = 10, repeats = 1)
 
 recipe_logReg <- 
