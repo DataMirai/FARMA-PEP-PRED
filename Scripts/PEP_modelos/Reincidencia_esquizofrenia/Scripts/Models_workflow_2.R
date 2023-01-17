@@ -9,7 +9,7 @@ pacman::p_load(
   # para cargar todas als librereias requeridas directamente 
   tidyverse, tidymodels, # Conjunto de librerías de progtamación de buena sintaxis y funcional
   parsnip, ranger, #Modelizacion con tidymodels, mice,
-  glmnet,probably,rsample, modeldata,
+  naniar,randomForest,glmnet,doParallel,DALEXtra,broom,
   readxl # importación y exportaciónd e datos)
 )
 
@@ -20,9 +20,9 @@ pacman::p_load(
 
 # Specify the number of splits in the previous argument N_splits_desirable
 
-N_splits_desirable <- 10
+N_splits_desirable <- 20
 
-PNS_ML_LR_tibble <- tibble(
+reincidencia_PNS_ML_RF_tibble <- tibble(
   'data_split'= rerun(
     .n = N_splits_desirable, 
     initial_split(data = reincidencia_data_PNS, prop = 0.80))) %>% 
@@ -33,14 +33,14 @@ PNS_ML_LR_tibble <- tibble(
     data_training = map(data_split, ~ training(.x)),
     data_testing  = map(data_split, ~ testing(.x)))
 
-PNS_ML_LR_tibble
+reincidencia_PNS_ML_RF_tibble
 
 # //////////////////////////////////////////////////////////////////////
 # - Recipe and Formulas specification ---- 
 # //////////////////////////////////////////////////////////////////////
 
-PNS_ML_LR_tibble <-
-  PNS_ML_LR_tibble %>%
+reincidencia_PNS_ML_RF_tibble <-
+  reincidencia_PNS_ML_RF_tibble %>%
   mutate(
     # Creacion de la receta
     'recipe_1' = map(
@@ -60,49 +60,83 @@ PNS_ML_LR_tibble <-
     #     step_dummy(all_nominal(), -all_outcomes(), one_hot = T) %>%
     #     step_corr(all_numeric() ,   threshold = 0.9) %>%
     #     prep(.))
-  )
+    )
 
-PNS_ML_LR_tibble
-
+reincidencia_PNS_ML_RF_tibble
 # //////////////////////////////////////////////////////////////////////
 # - Model definition ---- 
 # //////////////////////////////////////////////////////////////////////
 
 
-model_spec_Logreg <-
-  # calibrado del modelo de regresion logistica 
-  logistic_reg(penalty = 0.01, mixture = 0.85 ) %>% 
+model_spec_randomForest_ranger <-
+  # calibrado del modelo de random Forest
+  rand_forest(trees = tune(),
+              #mtry = tune(),
+              min_n = tune()) %>%
   set_mode("classification") %>%
-  set_engine("glmnet")
+  set_engine("ranger")
 
 
-
-PNS_ML_LR_tibble <- PNS_ML_LR_tibble %>% 
+reincidencia_PNS_ML_RF_tibble <- 
+  reincidencia_PNS_ML_RF_tibble %>% 
   mutate(
-    'model_spec_1'= list(model_spec_Logreg)
+    'model_spec_1'= list(model_spec_randomForest_ranger)
     # ,'model_spec_2'= list(model_spec_randomForest_ranger)
+    )
+
+
+# //////////////////////////////////////////////////////////////////////
+# - hyper parameter tunning ---- 
+# //////////////////////////////////////////////////////////////////////
+
+tune_best_list <- pmap(
+  reincidencia_PNS_ML_RF_tibble %>% 
+    select(recipe_1 , model_spec_1,data_training) %>% 
+    as.list(),
+  ~ workflow() %>%
+    add_recipe(..1) %>%
+    add_model(..2) %>%
+    tune_grid(
+      .,
+      resamples =  vfold_cv(data = ..3, v = 5, repeats = 1),
+      grid = grid_latin_hypercube(trees(), min_n(), size = 10))
+)
+
+tune_best_list
+
+reincidencia_PNS_ML_RF_tibble <- 
+  reincidencia_PNS_ML_RF_tibble %>% 
+  mutate(
+    'best_tune'  =  map(tune_best_list, ~ .x %>% select_best(metric = "roc_auc")),
+    'tune_trees' =  map_dbl(tune_best_list , ~ collect_metrics(.x) %>% pull(trees) %>% mean()),
+    'tune_min_n' =  map_dbl(tune_best_list , ~ collect_metrics(.x) %>% pull(min_n) %>% mean())
   )
+
+reincidencia_PNS_ML_RF_tibble
 
 # //////////////////////////////////////////////////////////////////////
 # - Models fit ---- 
 # //////////////////////////////////////////////////////////////////////
 
-PNS_models_Logreg <- pmap(
-  as.list(PNS_ML_LR_tibble),
+PNS_models_RF <- pmap(
+  as.list(reincidencia_PNS_ML_RF_tibble),
   ~ workflow() %>%
     add_recipe(..5) %>%
     add_model(..6) %>% 
-    last_fit(., split= ..2) ) %>%  
-  set_names( PNS_ML_LR_tibble$id)
+    finalize_workflow(..7) %>% 
+    last_fit(..2) ) %>%  set_names( reincidencia_PNS_ML_RF_tibble$id)
 
-PNS_models_Logreg
+PNS_models_RF
 
 # //////////////////////////////////////////////////////////////////////
 # - Models evalutations ---- 
 # //////////////////////////////////////////////////////////////////////
 
 
-PNS_models_Logreg %>% 
+PNS_models_RF[[1]]$.predictions[[1]] %>% 
+  filter( .pred_class != PNS_DEFINITIVA)
+
+PNS_models_RF %>% 
   map(~ pull(.x,.predictions) %>% flatten_df() ) %>% 
   map(~
         conf_mat(
@@ -111,14 +145,14 @@ PNS_models_Logreg %>%
           estimate = .pred_class) %>%  summary() )
 
 
-PNS_models_Logreg %>% 
+PNS_models_RF %>% 
   map(~ pull(.x,.metrics) %>% flatten_df() ) %>%  
   bind_rows() %>% 
   filter(.metric=='roc_auc' ) 
 
 
 
-PNS_models_Logreg %>% 
+PNS_models_RF %>% 
   map(~ pull(.x,.predictions) %>% flatten_df() ) %>% 
   map(~conf_mat(data= .x,
                 truth = PNS_DEFINITIVA,
@@ -126,7 +160,7 @@ PNS_models_Logreg %>%
 
 
 
-PNS_models_Logreg %>% 
+PNS_models_RF %>% 
   map(~ pull(.x,.predictions) %>% flatten_df() ) %>% 
   map(~
         conf_mat(
@@ -137,7 +171,7 @@ PNS_models_Logreg %>%
 
 
 
-PNS_models_Logreg %>% 
+PNS_models_RF %>% 
   map(~ pull(.x,.predictions) %>% flatten_df() ) %>% 
   map(~
         conf_mat(
@@ -148,16 +182,36 @@ PNS_models_Logreg %>%
         filter(.metric %in% c('accuracy','sens','spec')) %>%
         select( .metric, .estimate )) %>%  bind_rows() %>% 
   bind_rows(
-    PNS_models_Logreg %>% 
+    PNS_models_RF %>% 
       map(~ pull(.x,.metrics) %>% flatten_df() ) %>%
       bind_rows() %>% 
       select(.metric, .estimate) %>% 
       filter(.metric=='roc_auc') ) %>% 
   ggplot(.,aes(.metric ,.estimate, fill= .metric) ) +
   ggdist::stat_halfeye()
+  # stat_halfeye(
+  #   position = "dodge",
+  #   point_interval = median_qi,
+  #   aes(fill = after_stat(cut_cdf_qi(
+  #     cdf, .width = c(0.66, 0.95, 1)
+  #   ))),
+  #   height = 0.75,
+  #   slab_alpha = 0.7,
+  #   interval_size = 3,
+  #   interval_size_range = c(3, 5.5),
+  #   interval_colour = "darkgoldenrod2",
+  #   point_alpha = 1,
+  #   point_colour = "black",
+  #   shape = 18,
+  #   fatten_point = 1
+  # ) +
 
 
-PNS_models_Logreg %>% 
+
+
+
+
+PNS_models_RF %>% 
   map(~ pull(.x,.predictions) %>% flatten_df() ) %>% 
   map(~
         conf_mat(
@@ -178,88 +232,5 @@ PNS_models_Logreg %>%
 
 
 
-best_accuracy_model <- PNS_models_Logreg %>% 
-  map(~ pull(.x,.predictions) %>% flatten_df() ) %>% 
-  map(~
-        conf_mat(
-          data= .x,
-          truth = PNS_DEFINITIVA,
-          estimate = .pred_class) %>%  summary() ) %>% 
-  map(~ .x %>%  select(-.estimator ) ) %>% 
-  map_dfr(~.x) %>% 
-  group_by(.metric) %>% 
-  nest()  %>% 
-  ungroup() %>% 
-  filter(.metric=='accuracy' ) %>% 
-  unnest(-.metric ) %>% 
-  with(which(.estimate >= 0.80 ))
 
-
-# //////////////////////////////////////////////////////////////////////
-# - Models evalutations ---- 
-# //////////////////////////////////////////////////////////////////////
-
-model_PNS <- PNS_models_Logreg[[best_accuracy_model]] %>% flatten()
-
-post_model_data <- reincidencia_data_PNS %>% 
-  slice(model_PNS$.predictions$.row) %>% 
-  mutate(model_case_id = model_PNS$.predictions$.row  )
-
-PNS_test_predicted <- inner_join(
-  model_PNS$.predictions,
-  post_model_data,
-  by= c('.row'= 'model_case_id' )
-)
-
-PNS_pred_0.5 <-  PNS_test_predicted %>%
-  mutate(
-    .pred = make_two_class_pred(
-      estimate = .pred_1, 
-      levels = levels(PNS_DEFINITIVA.x), 
-      threshold = .5)) %>%
-  select(PNS_DEFINITIVA.x, contains(".pred"))
-
-PNS_pred_0.5 %>% 
-  count(.truth = PNS_DEFINITIVA.x, .pred)
-
-PNS_pred_0.75 <-  PNS_test_predicted %>%
-  mutate(
-    .pred = make_two_class_pred(
-      estimate = .pred_1, 
-      levels = levels(PNS_DEFINITIVA.x), 
-      threshold = .65)) %>%
-  select(PNS_DEFINITIVA.x, contains(".pred"))
-
-PNS_pred_0.75 %>% 
-  count(.truth = PNS_DEFINITIVA.x, .pred)
-
-
-threshold_data <- PNS_test_predicted %>%
-  threshold_perf(PNS_DEFINITIVA.x, .pred_1, thresholds = seq(0.5, 0.75, by = 0.0025)) 
-
-
-threshold_data <- threshold_data %>%
-  filter(.metric != "distance") %>%
-  mutate(group = case_when(
-    .metric == "sens" | .metric == "spec" ~ "1",
-    TRUE ~ "2"
-  ))
-
-max_j_index_threshold <- threshold_data %>%
-  filter(.metric == "j_index") %>%
-  filter(.estimate == max(.estimate)) %>%
-  pull(.threshold)
-
-ggplot(threshold_data, aes(x = .threshold, y = .estimate, color = .metric, alpha = group)) +
-  geom_line() +
-  theme_minimal() +
-  scale_color_viridis_d(end = 0.9) +
-  scale_alpha_manual(values = c(.4, 1), guide = "none") +
-  geom_vline(xintercept = max_j_index_threshold, alpha = .6, color = "grey30") +
-  labs(
-    x = "'Good' Threshold\n(above this value is considered 'good')",
-    y = "Metric Estimate",
-    title = "Balancing performance by varying the threshold",
-    subtitle = "Sensitivity or specificity alone might not be enough!\nVertical line = Max J-Index"
-  )
 

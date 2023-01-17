@@ -64,8 +64,7 @@ random_forest_grid %>%
   scale_x_log10() +
   scale_color_viridis_c()
 
-mejor_clasificacion <-
-  random_forest_grid %>% select_best(metric = "roc_auc")
+mejor_clasificacion <- random_forest_grid %>% select_best(metric = "roc_auc")
 
 final_wf_Randomforest <-  workflow_randomForest %>%
   finalize_workflow(mejor_clasificacion)

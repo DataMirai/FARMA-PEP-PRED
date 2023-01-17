@@ -59,8 +59,8 @@ reincidencia_data_PNS <- read_xlsx('Data/PEP/PEP_proyecto_esquizofrenia/PEP_Aito
   mutate(Nivel_socioeconomico = case_when(
     Nivel_socioeconomico %in% c("Medium","Medium-High","Medium-Low") ~ "Medium",
     Nivel_socioeconomico == "Unknown" ~ NA_character_ ,
-    TRUE ~as.character(Nivel_urbanicidad)) %>% as.factor() ) %>% 
-  mutate_if(is.character,as.factor ) %>% 
+    TRUE ~as.character(Nivel_urbanicidad)) %>% as.factor() ) %>%
+  mutate_if(is.character,as.factor ) %>%
   select(
     PNS_DEFINITIVA,
     #Numericas
@@ -73,8 +73,8 @@ reincidencia_data_PNS <- read_xlsx('Data/PEP/PEP_proyecto_esquizofrenia/PEP_Aito
     # geneticas
     PRS_CP,PRS_Neuroticism,PRS_EA,PRS_OCD,PRS_SZ,
     #Categoricas
-    Antecedentes_psiquiátricos, Cocaina_VB, Alcohol_VB, Sexo, Nivel_socioeconomico
-  )
+    Antecedentes_psiquiátricos, Cocaina_VB, Alcohol_VB, 
+    Sexo, Nivel_socioeconomico,Nivel_urbanicidad)
 
 skimr::skim( reincidencia_data_PNS)
 
